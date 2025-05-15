@@ -1,5 +1,6 @@
 package org.example.hometracker_kurs.service;
 
+import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import org.example.hometracker_kurs.dao.TaskDAO;
 import org.example.hometracker_kurs.dao.TaskDAOFactory;
@@ -48,7 +49,8 @@ public class TaskService {
     }
 
     public ObservableList<Task> getAllTasks() throws SQLException {
-        return taskDAO.getAllTasks();
+        // Возвращаем новый список, чтобы TableView видел обновления
+        return FXCollections.observableArrayList(taskDAO.getAllTasks());
     }
 
     public ObservableList<Task> getFilteredTasks(String type, String status, String searchText) throws SQLException {

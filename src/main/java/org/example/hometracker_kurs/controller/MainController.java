@@ -116,12 +116,12 @@ public class MainController {
 
     @FXML
     private void refreshData() {
-        if (taskService == null) return;
         try {
-            taskTable.setItems(taskService.getAllTasks());
-            updateStatistics();
+            ObservableList<Task> tasks = taskService.getAllTasks();
+            taskTable.setItems(tasks);
         } catch (SQLException e) {
-            showAlert("Ошибка загрузки", e.getMessage());
+            showAlert("Ошибка загрузки задач", e.getMessage());
+            taskTable.setItems(FXCollections.observableArrayList());
         }
     }
 
@@ -185,6 +185,7 @@ public class MainController {
         try {
             taskService.completeTask(selected.getId());
             refreshData();
+            taskTable.refresh();
         } catch (SQLException e) {
             showAlert("Ошибка выполнения", e.getMessage());
         }
@@ -215,6 +216,7 @@ public class MainController {
                 int daysToPostpone = Integer.parseInt(days);
                 taskService.postponeTask(selected.getId(), daysToPostpone);
                 refreshData();
+                taskTable.refresh();
                 showAlert("Успех", "Задача успешно отложена на " + days + " дней");
             } catch (NumberFormatException e) {
                 showAlert("Ошибка", "Введите корректное число дней");
@@ -237,6 +239,7 @@ public class MainController {
         try {
             taskService.cancelTask(selected.getId());
             refreshData();
+            taskTable.refresh();
             showAlert("Успех", "Задача отменена");
         } catch (SQLException e) {
             showAlert("Ошибка", "Не удалось отменить задачу: " + e.getMessage());
@@ -254,6 +257,7 @@ public class MainController {
         try {
             taskService.reactivateTask(selected.getId());
             refreshData();
+            taskTable.refresh();
             showAlert("Успех", "Задача снова активна");
         } catch (SQLException e) {
             showAlert("Ошибка", "Не удалось активировать задачу: " + e.getMessage());
