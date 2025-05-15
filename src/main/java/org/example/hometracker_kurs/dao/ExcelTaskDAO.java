@@ -228,7 +228,7 @@ public class ExcelTaskDAO implements TaskDAO {
         existing.setDueDate(task.getDueDate());
         existing.setPriority(task.getPriority());
         existing.setAssignedTo(task.getAssignedTo());
-        existing.setStatus(task.getStatus());
+        existing.setStatus(task.getStatus()); // Просто устанавливаем новый статус
         existing.setLastCompleted(task.getLastCompleted());
         existing.setFrequencyDays(task.getFrequencyDays());
 

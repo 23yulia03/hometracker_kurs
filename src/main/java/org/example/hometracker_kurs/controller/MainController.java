@@ -4,17 +4,20 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
+import javafx.scene.paint.Color;
 import org.example.hometracker_kurs.model.Task;
 import org.example.hometracker_kurs.model.Task.TaskStatus;
 import org.example.hometracker_kurs.service.TaskService;
 
 import java.sql.SQLException;
 import java.time.LocalDate;
+import java.util.Optional;
 
 public class MainController {
     private TaskService taskService;
 
     @FXML private TableView<Task> taskTable;
+    @FXML private TableColumn<Task, TaskStatus> statusColumn;
     @FXML private ComboBox<String> taskTypeComboBox;
     @FXML private ComboBox<String> statusComboBox;
     @FXML private TextField searchField;
@@ -41,6 +44,7 @@ public class MainController {
     public void initialize() {
         initializeComboBoxes();  // Инициализация ComboBox
         setupTableColumns();  // Настройка таблицы
+        setupStatusColumn();
     }
 
     private void initializeComboBoxes() {
@@ -65,6 +69,27 @@ public class MainController {
                 (obs, oldSel, newSel) -> {
                     if (newSel != null) fillFormWithSelectedTask(newSel);
                 });
+    }
+
+    private void setupStatusColumn() {
+        statusColumn.setCellFactory(col -> new TableCell<>() {
+            @Override
+            protected void updateItem(TaskStatus status, boolean empty) {
+                super.updateItem(status, empty);
+                if (empty || status == null) {
+                    setText(null);
+                    setGraphic(null);
+                } else {
+                    setText(status.getDisplayName());
+                    switch (status) {
+                        case ACTIVE -> setTextFill(Color.GREEN);
+                        case COMPLETED -> setTextFill(Color.BLUE);
+                        case POSTPONED -> setTextFill(Color.ORANGE);
+                        case CANCELLED -> setTextFill(Color.GRAY);
+                    }
+                }
+            }
+        });
     }
 
     private void setDataSource(String type) {
@@ -162,6 +187,76 @@ public class MainController {
             refreshData();
         } catch (SQLException e) {
             showAlert("Ошибка выполнения", e.getMessage());
+        }
+    }
+
+    @FXML
+    private void postponeTask() {
+        Task selected = taskTable.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            showAlert("Ошибка", "Выберите задачу для откладывания");
+            return;
+        }
+
+        // Проверяем, не является ли задача уже отложенной
+        if (selected.getStatus() == TaskStatus.POSTPONED) {
+            showAlert("Информация", "Задача уже отложена");
+            return;
+        }
+
+        TextInputDialog dialog = new TextInputDialog("7");
+        dialog.setTitle("Отложить задачу");
+        dialog.setHeaderText("На сколько дней отложить задачу?");
+        dialog.setContentText("Дней:");
+
+        Optional<String> result = dialog.showAndWait();
+        result.ifPresent(days -> {
+            try {
+                int daysToPostpone = Integer.parseInt(days);
+                taskService.postponeTask(selected.getId(), daysToPostpone);
+                refreshData();
+                showAlert("Успех", "Задача успешно отложена на " + days + " дней");
+            } catch (NumberFormatException e) {
+                showAlert("Ошибка", "Введите корректное число дней");
+            } catch (SQLException e) {
+                showAlert("Ошибка", "Не удалось отложить задачу: " + e.getMessage());
+            } catch (IllegalArgumentException e) {
+                showAlert("Ошибка", e.getMessage());
+            }
+        });
+    }
+
+    @FXML
+    private void cancelTask() {
+        Task selected = taskTable.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            showAlert("Ошибка", "Выберите задачу для отмены");
+            return;
+        }
+
+        try {
+            taskService.cancelTask(selected.getId());
+            refreshData();
+            showAlert("Успех", "Задача отменена");
+        } catch (SQLException e) {
+            showAlert("Ошибка", "Не удалось отменить задачу: " + e.getMessage());
+        }
+    }
+
+    @FXML
+    private void reactivateTask() {
+        Task selected = taskTable.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            showAlert("Ошибка", "Выберите задачу для активации");
+            return;
+        }
+
+        try {
+            taskService.reactivateTask(selected.getId());
+            refreshData();
+            showAlert("Успех", "Задача снова активна");
+        } catch (SQLException e) {
+            showAlert("Ошибка", "Не удалось активировать задачу: " + e.getMessage());
         }
     }
 

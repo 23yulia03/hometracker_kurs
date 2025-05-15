@@ -9,8 +9,11 @@ import java.sql.*;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class H2TaskDAO implements TaskDAO {
+    private static final Logger logger = Logger.getLogger(H2TaskDAO.class.getName());
     private final Connection connection;
     private final List<Task> tasks = new ArrayList<>();
     private int nextId = 1;
@@ -28,7 +31,7 @@ public class H2TaskDAO implements TaskDAO {
                 "due_date DATE, " +
                 "priority INT, " +
                 "assigned_to VARCHAR(50), " +
-                "status VARCHAR(20), " +
+                "status VARCHAR(20) NOT NULL CHECK (status IN ('ACTIVE', 'COMPLETED', 'POSTPONED', 'CANCELLED')), " +
                 "last_completed DATE, " +
                 "frequency_days INT)";
 
@@ -71,13 +74,17 @@ public class H2TaskDAO implements TaskDAO {
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
             stmt.setInt(1, id);
             try (ResultSet rs = stmt.executeQuery()) {
-                return rs.next() ? extractTaskFromResultSet(rs) : null;
+                if (rs.next()) {
+                    return extractTaskFromResultSet(rs);
+                }
+                throw new SQLException("Task not found with id: " + id);
             }
         }
     }
 
     @Override
     public void addTask(Task task) throws SQLException {
+        validateTask(task);
         String sql = "INSERT INTO tasks VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
             stmt.setInt(1, task.getId());
@@ -90,11 +97,15 @@ public class H2TaskDAO implements TaskDAO {
             stmt.setDate(8, task.getLastCompleted() != null ? Date.valueOf(task.getLastCompleted()) : null);
             stmt.setInt(9, task.getFrequencyDays());
             stmt.executeUpdate();
+        } catch (SQLException e) {
+            logger.log(Level.SEVERE, "Error adding task", e);
+            throw e;
         }
     }
 
     @Override
     public void updateTask(Task task) throws SQLException {
+        validateTask(task);
         String sql = "UPDATE tasks SET name = ?, description = ?, due_date = ?, priority = ?, " +
                 "assigned_to = ?, status = ?, last_completed = ?, frequency_days = ? WHERE id = ?";
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
@@ -108,6 +119,9 @@ public class H2TaskDAO implements TaskDAO {
             stmt.setInt(8, task.getFrequencyDays());
             stmt.setInt(9, task.getId());
             stmt.executeUpdate();
+        } catch (SQLException e) {
+            logger.log(Level.SEVERE, "Error updating task", e);
+            throw e;
         }
     }
 
@@ -116,12 +130,22 @@ public class H2TaskDAO implements TaskDAO {
         String sql = "DELETE FROM tasks WHERE id = ?";
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
             stmt.setInt(1, id);
-            stmt.executeUpdate();
+            int affectedRows = stmt.executeUpdate();
+            if (affectedRows == 0) {
+                throw new SQLException("Task not found with id: " + id);
+            }
+        } catch (SQLException e) {
+            logger.log(Level.SEVERE, "Error deleting task", e);
+            throw e;
         }
     }
 
     @Override
     public ObservableList<Task> getTasksByAssignee(String assignee) throws SQLException {
+        if (assignee == null || assignee.trim().isEmpty()) {
+            throw new SQLException("Assignee cannot be empty");
+        }
+
         ObservableList<Task> result = FXCollections.observableArrayList();
         String sql = "SELECT * FROM tasks WHERE assigned_to = ?";
 
@@ -138,6 +162,13 @@ public class H2TaskDAO implements TaskDAO {
 
     @Override
     public ObservableList<Task> getTasksDueBetween(LocalDate start, LocalDate end) throws SQLException {
+        if (start == null || end == null) {
+            throw new SQLException("Start and end dates cannot be null");
+        }
+        if (start.isAfter(end)) {
+            throw new SQLException("Start date cannot be after end date");
+        }
+
         ObservableList<Task> result = FXCollections.observableArrayList();
         String sql = "SELECT * FROM tasks WHERE due_date BETWEEN ? AND ?";
 
@@ -155,6 +186,16 @@ public class H2TaskDAO implements TaskDAO {
 
     @Override
     public void updateTaskStatus(int id, Task.TaskStatus status) throws SQLException {
+        if (status == null) {
+            throw new SQLException("Status cannot be null");
+        }
+
+        Task task = getTaskById(id);
+        if (!Task.TaskStatus.isTransitionAllowed(task.getStatus(), status)) {
+            throw new SQLException(String.format("Invalid status transition: %s -> %s",
+                    task.getStatus().getDisplayName(), status.getDisplayName()));
+        }
+
         String sql = "UPDATE tasks SET status = ?, last_completed = ? WHERE id = ?";
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
             stmt.setString(1, status.name());
@@ -166,13 +207,7 @@ public class H2TaskDAO implements TaskDAO {
 
     @Override
     public void markTaskAsCompleted(int id) throws SQLException {
-        String sql = "UPDATE tasks SET status = ?, last_completed = ? WHERE id = ?";
-        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-            stmt.setString(1, Task.TaskStatus.COMPLETED.name());
-            stmt.setDate(2, Date.valueOf(LocalDate.now()));
-            stmt.setInt(3, id);
-            stmt.executeUpdate();
-        }
+        updateTaskStatus(id, Task.TaskStatus.COMPLETED);
     }
 
     @Override
@@ -181,7 +216,7 @@ public class H2TaskDAO implements TaskDAO {
         StringBuilder sql = new StringBuilder("SELECT * FROM tasks WHERE 1=1");
 
         if (type != null && !type.isEmpty()) {
-            sql.append(" AND type = ?");
+            sql.append(" AND assigned_to = ?");
         }
 
         if (status != null && !status.equals("Все")) {
@@ -208,20 +243,10 @@ public class H2TaskDAO implements TaskDAO {
                 stmt.setString(index++, kw);
             }
 
-            ResultSet rs = stmt.executeQuery();
-            while (rs.next()) {
-                Task task = new Task(
-                        rs.getInt("id"),
-                        rs.getString("name"),
-                        rs.getString("description"),
-                        rs.getDate("due_date") != null ? rs.getDate("due_date").toLocalDate() : null,
-                        rs.getInt("priority"),
-                        rs.getString("assigned_to"),
-                        Task.TaskStatus.valueOf(rs.getString("status")),
-                        rs.getDate("last_completed") != null ? rs.getDate("last_completed").toLocalDate() : null,
-                        rs.getInt("frequency_days")
-                );
-                result.add(task);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    result.add(extractTaskFromResultSet(rs));
+                }
             }
         }
 
@@ -232,6 +257,18 @@ public class H2TaskDAO implements TaskDAO {
     public void close() throws SQLException {
         if (connection != null && !connection.isClosed()) {
             connection.close();
+        }
+    }
+
+    private void validateTask(Task task) throws SQLException {
+        if (task == null) {
+            throw new SQLException("Задача не может быть пустой");
+        }
+        if (task.getName() == null || task.getName().trim().isEmpty()) {
+            throw new SQLException("Имя задачи не может быть пустым");
+        }
+        if (task.getStatus() == null) {
+            throw new SQLException("Статус задачи не может быть пустым");
         }
     }
 }

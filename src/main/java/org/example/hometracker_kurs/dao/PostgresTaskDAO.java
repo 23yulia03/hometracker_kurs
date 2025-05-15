@@ -50,7 +50,7 @@ public class PostgresTaskDAO implements TaskDAO {
                 due_date DATE,
                 priority INTEGER,
                 assigned_to VARCHAR(50),
-                status VARCHAR(20) NOT NULL,
+                status VARCHAR(20) NOT NULL CHECK (status IN ('ACTIVE', 'COMPLETED', 'POSTPONED', 'CANCELLED')),
                 last_completed DATE,
                 frequency_days INTEGER,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -125,6 +125,9 @@ public class PostgresTaskDAO implements TaskDAO {
                     task.setId(rs.getInt("id"));
                 }
             }
+        } catch (SQLException e) {
+            logger.log(Level.SEVERE, "Error adding task", e);
+            throw e;
         }
     }
 
@@ -146,6 +149,9 @@ public class PostgresTaskDAO implements TaskDAO {
             if (affectedRows == 0) {
                 throw new SQLException("Task not found with id: " + task.getId());
             }
+        } catch (SQLException e) {
+            logger.log(Level.SEVERE, "Error updating task", e);
+            throw e;
         }
     }
 
@@ -181,6 +187,9 @@ public class PostgresTaskDAO implements TaskDAO {
             if (affectedRows == 0) {
                 throw new SQLException("Task not found with id: " + id);
             }
+        } catch (SQLException e) {
+            logger.log(Level.SEVERE, "Error deleting task", e);
+            throw e;
         }
     }
 
@@ -234,6 +243,12 @@ public class PostgresTaskDAO implements TaskDAO {
             throw new SQLException("Status cannot be null");
         }
 
+        Task task = getTaskById(id);
+        if (!Task.TaskStatus.isTransitionAllowed(task.getStatus(), status)) {
+            throw new SQLException(String.format("Invalid status transition: %s -> %s",
+                    task.getStatus().getDisplayName(), status.getDisplayName()));
+        }
+
         String sql = """
             UPDATE tasks SET 
             status = ?, 
@@ -250,18 +265,15 @@ public class PostgresTaskDAO implements TaskDAO {
             if (affectedRows == 0) {
                 throw new SQLException("Task not found with id: " + id);
             }
+        } catch (SQLException e) {
+            logger.log(Level.SEVERE, "Error updating task status", e);
+            throw e;
         }
     }
 
     @Override
     public void markTaskAsCompleted(int id) throws SQLException {
-        String sql = "UPDATE tasks SET status = ?, last_completed = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?";
-        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-            stmt.setString(1, Task.TaskStatus.COMPLETED.name());
-            stmt.setDate(2, Date.valueOf(LocalDate.now()));
-            stmt.setInt(3, id);
-            stmt.executeUpdate();
-        }
+        updateTaskStatus(id, Task.TaskStatus.COMPLETED);
     }
 
     @Override
@@ -269,12 +281,10 @@ public class PostgresTaskDAO implements TaskDAO {
         ObservableList<Task> result = FXCollections.observableArrayList();
         StringBuilder sql = new StringBuilder("SELECT * FROM tasks WHERE 1=1");
 
-        // Фильтр по типу (assigned_to)
         if (type != null && !type.isEmpty()) {
             sql.append(" AND assigned_to = ?");
         }
 
-        // Фильтр по статусу
         if (status != null && !status.equals("Все")) {
             switch (status) {
                 case "Активные" -> sql.append(" AND status = 'ACTIVE'");
@@ -284,7 +294,6 @@ public class PostgresTaskDAO implements TaskDAO {
             }
         }
 
-        // Фильтр по ключевому слову
         if (keyword != null && !keyword.isBlank()) {
             sql.append(" AND (LOWER(name) LIKE ? OR LOWER(description) LIKE ?)");
         }
