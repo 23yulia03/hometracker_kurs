@@ -100,7 +100,7 @@
     <TextField fx:id="nameField" GridPane.columnIndex="1" GridPane.rowIndex="0" />
 
     <Label text="Описание:" GridPane.columnIndex="0" GridPane.rowIndex="1" />
-    <TextArea fx:id="descriptionField" GridPane.columnIndex="1" GridPane.rowIndex="1" />
+    <TextArea fx:id="descriptionField" prefHeight="66.0" prefWidth="478.0" GridPane.columnIndex="1" GridPane.rowIndex="1" />
 
     <Label text="Срок выполнения:" GridPane.columnIndex="0" GridPane.rowIndex="2" />
     <DatePicker fx:id="dueDatePicker" GridPane.columnIndex="1" GridPane.rowIndex="2" />

@@ -4,6 +4,7 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import org.example.hometracker_kurs.model.Config;
 import org.example.hometracker_kurs.model.Task;
+import org.example.hometracker_kurs.model.TaskStatus;
 
 import java.sql.*;
 import java.time.LocalDate;
@@ -88,7 +89,7 @@ public class PostgresTaskDAO implements TaskDAO {
                 rs.getDate("due_date") != null ? rs.getDate("due_date").toLocalDate() : null,
                 rs.getInt("priority"),
                 rs.getString("assigned_to"),
-                Task.TaskStatus.valueOf(rs.getString("status")),
+                TaskStatus.valueOf(rs.getString("status")),
                 rs.getDate("last_completed") != null ? rs.getDate("last_completed").toLocalDate() : null,
                 rs.getInt("frequency_days")
         );
@@ -238,13 +239,13 @@ public class PostgresTaskDAO implements TaskDAO {
     }
 
     @Override
-    public void updateTaskStatus(int id, Task.TaskStatus status) throws SQLException {
+    public void updateTaskStatus(int id, TaskStatus status) throws SQLException {
         if (status == null) {
             throw new SQLException("Status cannot be null");
         }
 
         Task task = getTaskById(id);
-        if (!Task.TaskStatus.isTransitionAllowed(task.getStatus(), status)) {
+        if (!TaskStatus.isTransitionAllowed(task.getStatus(), status)) {
             throw new SQLException(String.format("Invalid status transition: %s -> %s",
                     task.getStatus().getDisplayName(), status.getDisplayName()));
         }
@@ -259,7 +260,7 @@ public class PostgresTaskDAO implements TaskDAO {
 
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
             stmt.setString(1, status.name());
-            stmt.setDate(2, status == Task.TaskStatus.COMPLETED ? Date.valueOf(LocalDate.now()) : null);
+            stmt.setDate(2, status == TaskStatus.COMPLETED ? Date.valueOf(LocalDate.now()) : null);
             stmt.setInt(3, id);
             int affectedRows = stmt.executeUpdate();
             if (affectedRows == 0) {
@@ -273,7 +274,7 @@ public class PostgresTaskDAO implements TaskDAO {
 
     @Override
     public void markTaskAsCompleted(int id) throws SQLException {
-        updateTaskStatus(id, Task.TaskStatus.COMPLETED);
+        updateTaskStatus(id, TaskStatus.COMPLETED);
     }
 
     @Override

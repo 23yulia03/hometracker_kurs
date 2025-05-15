@@ -6,7 +6,7 @@ import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.paint.Color;
 import org.example.hometracker_kurs.model.Task;
-import org.example.hometracker_kurs.model.Task.TaskStatus;
+import org.example.hometracker_kurs.model.TaskStatus;
 import org.example.hometracker_kurs.service.TaskService;
 
 import java.sql.SQLException;
@@ -37,7 +37,7 @@ public class MainController {
     @FXML private Label dataSourceLabel;
 
     public MainController() {
-        // Пустой конструктор
+
     }
 
     @FXML
@@ -45,6 +45,9 @@ public class MainController {
         initializeComboBoxes();  // Инициализация ComboBox
         setupTableColumns();  // Настройка таблицы
         setupStatusColumn();
+
+        // Отложить обновление просроченных задач после инициализации UI
+        javafx.application.Platform.runLater(this::updateOverdueTasks);
     }
 
     private void initializeComboBoxes() {
@@ -86,6 +89,7 @@ public class MainController {
                         case COMPLETED -> setTextFill(Color.BLUE);
                         case POSTPONED -> setTextFill(Color.ORANGE);
                         case CANCELLED -> setTextFill(Color.GRAY);
+                        case OVERDUE -> setTextFill(Color.RED);  // красный для просроченных
                     }
                 }
             }
@@ -353,15 +357,36 @@ public class MainController {
         int total = tasks.size();
         int active = (int) tasks.stream().filter(t -> t.getStatus() == TaskStatus.ACTIVE).count();
         int completed = (int) tasks.stream().filter(t -> t.getStatus() == TaskStatus.COMPLETED).count();
-        int overdue = (int) tasks.stream().filter(t ->
-                t.getStatus() == TaskStatus.ACTIVE &&
-                        t.getDueDate() != null &&
-                        t.getDueDate().isBefore(LocalDate.now())).count();
+        int overdue = (int) tasks.stream().filter(t -> t.getStatus() == TaskStatus.OVERDUE).count();
 
         totalTasksLabel.setText(String.valueOf(total));
         activeTasksLabel.setText(String.valueOf(active));
         completedTasksLabel.setText(String.valueOf(completed));
         overdueTasksLabel.setText(String.valueOf(overdue));
+    }
+
+
+    private void updateOverdueTasks() {
+        try {
+            ObservableList<Task> tasks = taskService.getAllTasks();
+
+            boolean updated = false;
+
+            for (Task task : tasks) {
+                if (task.getStatus() == TaskStatus.ACTIVE && task.getDueDate() != null &&
+                        task.getDueDate().isBefore(LocalDate.now())) {
+                    task.setStatus(TaskStatus.OVERDUE);
+                    taskService.updateTask(task);
+                    updated = true;
+                }
+            }
+
+            if (updated) {
+                refreshData();
+            }
+        } catch (SQLException e) {
+            showAlert("Ошибка обновления статусов", e.getMessage());
+        }
     }
 
     @FXML
@@ -376,7 +401,6 @@ public class MainController {
             default -> setDataSource("Excel");
         }
     }
-
 
     private void showAlert(String title, String message) {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);

@@ -1,13 +1,11 @@
 package org.example.hometracker_kurs.model;
 
-/**
- * Перечисление статусов задачи с русскоязычными названиями
- */
 public enum TaskStatus {
     ACTIVE("Активная"),
     COMPLETED("Выполнена"),
     POSTPONED("Отложена"),
-    CANCELLED("Отменена");
+    CANCELLED("Отменена"),
+    OVERDUE("Просрочена");  // Добавили статус OVERDUE
 
     private final String displayName;
 
@@ -19,16 +17,9 @@ public enum TaskStatus {
         return displayName;
     }
 
-    /**
-     * Проверяет допустимость перехода между статусами
-     */
     public static boolean isTransitionAllowed(TaskStatus current, TaskStatus newStatus) {
-        // Разрешаем оставить тот же статус
-        if (current == newStatus) {
-            return true;
-        }
+        if (current == newStatus) return false;
 
-        // Логика разрешенных переходов между разными статусами
         switch (newStatus) {
             case COMPLETED:
                 return current != CANCELLED;

@@ -6,7 +6,7 @@ import org.example.hometracker_kurs.dao.TaskDAO;
 import org.example.hometracker_kurs.dao.TaskDAOFactory;
 import org.example.hometracker_kurs.model.Config;
 import org.example.hometracker_kurs.model.Task;
-import org.example.hometracker_kurs.model.Task.TaskStatus;
+import org.example.hometracker_kurs.model.TaskStatus;
 
 import java.sql.SQLException;
 import java.time.LocalDate;

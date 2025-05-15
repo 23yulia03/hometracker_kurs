@@ -6,6 +6,7 @@ import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.example.hometracker_kurs.model.Config;
 import org.example.hometracker_kurs.model.Task;
+import org.example.hometracker_kurs.model.TaskStatus;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -78,7 +79,7 @@ public class ExcelTaskDAO implements TaskDAO {
 
             int priority = (int) row.getCell(4).getNumericCellValue();
             String assignedTo = getCellStringValue(row.getCell(5));
-            Task.TaskStatus status = Task.TaskStatus.valueOf(getCellStringValue(row.getCell(6)));
+            TaskStatus status = TaskStatus.valueOf(getCellStringValue(row.getCell(6)));
 
             LocalDate lastCompleted = null;
             Cell lastCompletedCell = row.getCell(7);
@@ -178,9 +179,9 @@ public class ExcelTaskDAO implements TaskDAO {
                     boolean matchesStatus = switch (status) {
                         case "Все" -> true;
                         case null -> true;
-                        case "Активные" -> task.getStatus() == Task.TaskStatus.ACTIVE;
-                        case "Выполненные" -> task.getStatus() == Task.TaskStatus.COMPLETED;
-                        case "Просроченные" -> task.getStatus() == Task.TaskStatus.ACTIVE
+                        case "Активные" -> task.getStatus() == TaskStatus.ACTIVE;
+                        case "Выполненные" -> task.getStatus() == TaskStatus.COMPLETED;
+                        case "Просроченные" -> task.getStatus() == TaskStatus.ACTIVE
                                 && task.getDueDate() != null
                                 && task.getDueDate().isBefore(LocalDate.now());
                         default -> false;
@@ -276,11 +277,11 @@ public class ExcelTaskDAO implements TaskDAO {
     }
 
     @Override
-    public void updateTaskStatus(int id, Task.TaskStatus status) throws SQLException {
+    public void updateTaskStatus(int id, TaskStatus status) throws SQLException {
         Task task = getTaskById(id);
         task.setStatus(status);
 
-        if (status == Task.TaskStatus.COMPLETED) {
+        if (status == TaskStatus.COMPLETED) {
             task.setLastCompleted(LocalDate.now());
         }
 
@@ -290,7 +291,7 @@ public class ExcelTaskDAO implements TaskDAO {
     @Override
     public void markTaskAsCompleted(int id) throws SQLException {
         Task task = getTaskById(id);
-        task.setStatus(Task.TaskStatus.COMPLETED);
+        task.setStatus(TaskStatus.COMPLETED);
         task.setLastCompleted(LocalDate.now());
         saveToFile();
     }

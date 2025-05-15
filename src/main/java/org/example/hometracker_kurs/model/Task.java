@@ -2,6 +2,8 @@ package org.example.hometracker_kurs.model;
 
 import java.time.LocalDate;
 
+import org.example.hometracker_kurs.model.TaskStatus;
+
 public class Task {
     private int id;
     private String name;
@@ -13,36 +15,6 @@ public class Task {
     private String type;
     private LocalDate lastCompleted;
     private int frequencyDays;
-
-    public enum TaskStatus {
-        ACTIVE("Активная"),
-        COMPLETED("Выполнена"),
-        POSTPONED("Отложена"),
-        CANCELLED("Отменена");
-
-        private final String displayName;
-
-        TaskStatus(String displayName) {
-            this.displayName = displayName;
-        }
-
-        public String getDisplayName() {
-            return displayName;
-        }
-
-        public static boolean isTransitionAllowed(TaskStatus current, TaskStatus newStatus) {
-            if (current == newStatus) return false;
-
-            switch (newStatus) {
-                case COMPLETED:
-                    return current != CANCELLED;
-                case CANCELLED:
-                    return current != COMPLETED;
-                default:
-                    return true;
-            }
-        }
-    }
 
     public Task(int id, String name, String description, LocalDate dueDate,
                 int priority, String assignedTo, TaskStatus status,
@@ -80,12 +52,10 @@ public class Task {
     public void setFrequencyDays(int frequencyDays) { this.frequencyDays = frequencyDays; }
 
     public void setStatus(TaskStatus newStatus) {
-        // Разрешаем установку того же статуса (убираем проверку на равенство)
         if (this.status == newStatus) {
-            return; // Просто выходим, если статус не изменился
+            return;
         }
 
-        // Проверяем допустимость перехода между разными статусами
         if (!TaskStatus.isTransitionAllowed(this.status, newStatus)) {
             throw new IllegalArgumentException(
                     String.format("Недопустимый переход статуса: %s -> %s",
@@ -116,7 +86,6 @@ public class Task {
         if (dueDate != null) {
             this.dueDate = dueDate.plusDays(days);
         }
-        // Устанавливаем статус только если он действительно меняется
         if (this.status != TaskStatus.POSTPONED) {
             setStatus(TaskStatus.POSTPONED);
         }

@@ -2,6 +2,7 @@ package org.example.hometracker_kurs.dao;
 
 import javafx.collections.ObservableList;
 import org.example.hometracker_kurs.model.Task;
+import org.example.hometracker_kurs.model.TaskStatus;
 
 import java.sql.SQLException;
 import java.time.LocalDate;
@@ -31,8 +32,7 @@ public interface TaskDAO {
 
     ObservableList<Task> getFilteredTasks(String type, String status, String keyword) throws SQLException;
 
-    // Обновить статус задачи (например: ACTIVE → COMPLETED)
-    void updateTaskStatus(int id, Task.TaskStatus status) throws SQLException;
+    void updateTaskStatus(int id, TaskStatus status) throws SQLException;
 
     // Пометить задачу как выполненную (удобный алиас)
     void markTaskAsCompleted(int id) throws SQLException;
