@@ -36,10 +36,6 @@ public class MainController {
 
     @FXML private Label dataSourceLabel;
 
-    public MainController() {
-        //пустой конструктор
-    }
-
     @FXML
     public void initialize() {
 
