@@ -176,6 +176,59 @@ public class H2TaskDAO implements TaskDAO {
     }
 
     @Override
+    public ObservableList<Task> getFilteredTasks(String type, String status, String keyword) throws SQLException {
+        ObservableList<Task> result = FXCollections.observableArrayList();
+        StringBuilder sql = new StringBuilder("SELECT * FROM tasks WHERE 1=1");
+
+        if (type != null && !type.isEmpty()) {
+            sql.append(" AND type = ?");
+        }
+
+        if (status != null && !status.equals("Все")) {
+            switch (status) {
+                case "Активные" -> sql.append(" AND status = 'ACTIVE'");
+                case "Выполненные" -> sql.append(" AND status = 'COMPLETED'");
+                case "Просроченные" ->
+                        sql.append(" AND status = 'ACTIVE' AND due_date < CURRENT_DATE");
+            }
+        }
+
+        if (keyword != null && !keyword.isBlank()) {
+            sql.append(" AND (LOWER(name) LIKE ? OR LOWER(description) LIKE ?)");
+        }
+
+        try (PreparedStatement stmt = connection.prepareStatement(sql.toString())) {
+            int index = 1;
+            if (type != null && !type.isEmpty()) {
+                stmt.setString(index++, type);
+            }
+            if (keyword != null && !keyword.isBlank()) {
+                String kw = "%" + keyword.toLowerCase() + "%";
+                stmt.setString(index++, kw);
+                stmt.setString(index++, kw);
+            }
+
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                Task task = new Task(
+                        rs.getInt("id"),
+                        rs.getString("name"),
+                        rs.getString("description"),
+                        rs.getDate("due_date") != null ? rs.getDate("due_date").toLocalDate() : null,
+                        rs.getInt("priority"),
+                        rs.getString("assigned_to"),
+                        Task.TaskStatus.valueOf(rs.getString("status")),
+                        rs.getDate("last_completed") != null ? rs.getDate("last_completed").toLocalDate() : null,
+                        rs.getInt("frequency_days")
+                );
+                result.add(task);
+            }
+        }
+
+        return result;
+    }
+
+    @Override
     public void close() throws SQLException {
         if (connection != null && !connection.isClosed()) {
             connection.close();

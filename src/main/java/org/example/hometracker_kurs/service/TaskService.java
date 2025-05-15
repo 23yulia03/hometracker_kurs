@@ -53,6 +53,7 @@ public class TaskService {
         return allTasks.filtered(filter::test);
     }
 
+
     public void addTask(Task task) throws SQLException {
         taskDAO.addTask(task);
     }

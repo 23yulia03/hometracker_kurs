@@ -171,6 +171,29 @@ public class ExcelTaskDAO implements TaskDAO {
     }
 
     @Override
+    public ObservableList<Task> getFilteredTasks(String type, String status, String keyword) throws SQLException {
+        return tasks.stream()
+                .filter(task -> {
+                    boolean matchesType = (type == null || type.isEmpty() || type.equals(task.getType()));
+                    boolean matchesStatus = switch (status) {
+                        case "Все" -> true;
+                        case null -> true;
+                        case "Активные" -> task.getStatus() == Task.TaskStatus.ACTIVE;
+                        case "Выполненные" -> task.getStatus() == Task.TaskStatus.COMPLETED;
+                        case "Просроченные" -> task.getStatus() == Task.TaskStatus.ACTIVE
+                                && task.getDueDate() != null
+                                && task.getDueDate().isBefore(LocalDate.now());
+                        default -> false;
+                    };
+                    boolean matchesKeyword = (keyword == null || keyword.isBlank() ||
+                            task.getName().toLowerCase().contains(keyword.toLowerCase()) ||
+                            task.getDescription().toLowerCase().contains(keyword.toLowerCase()));
+                    return matchesType && matchesStatus && matchesKeyword;
+                })
+                .collect(FXCollections::observableArrayList, ObservableList::add, ObservableList::addAll);
+    }
+
+    @Override
     public Task getTaskById(int id) throws SQLException {
         return tasks.stream()
                 .filter(task -> task.getId() == id)

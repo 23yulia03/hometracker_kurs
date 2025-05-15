@@ -29,6 +29,8 @@ public interface TaskDAO {
     // Получить задачи с дедлайнами между двумя датами
     ObservableList<Task> getTasksDueBetween(LocalDate start, LocalDate end) throws SQLException;
 
+    ObservableList<Task> getFilteredTasks(String type, String status, String keyword) throws SQLException;
+
     // Обновить статус задачи (например: ACTIVE → COMPLETED)
     void updateTaskStatus(int id, Task.TaskStatus status) throws SQLException;
 

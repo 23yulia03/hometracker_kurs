@@ -267,18 +267,17 @@ public class MainController {
 
     @FXML
     private void switchDataSource() {
-        // Получаем текущий источник данных
-        String currentSource = dataSourceLabel.getText();
+        String currentLabel = dataSourceLabel.getText();
+        String currentSource = currentLabel.replace("Выбранный источник данных: ", "");
 
-        // Переключаем источники данных
-        if ("Excel".equals(currentSource)) {
-            setDataSource("PostgreSQL");
-        } else if ("PostgreSQL".equals(currentSource)) {
-            setDataSource("H2 Database");
-        } else {
-            setDataSource("Excel");
+        switch (currentSource) {
+            case "Excel" -> setDataSource("Excel");
+            case "PostgreSQL" -> setDataSource("PostgreSQL");
+            case "H2 Database" -> setDataSource("H2 Database");
+            default -> setDataSource("Excel");
         }
     }
+
 
     private void showAlert(String title, String message) {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);

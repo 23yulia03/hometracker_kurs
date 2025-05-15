@@ -265,6 +265,54 @@ public class PostgresTaskDAO implements TaskDAO {
     }
 
     @Override
+    public ObservableList<Task> getFilteredTasks(String type, String status, String keyword) throws SQLException {
+        ObservableList<Task> result = FXCollections.observableArrayList();
+        StringBuilder sql = new StringBuilder("SELECT * FROM tasks WHERE 1=1");
+
+        // Фильтр по типу (assigned_to)
+        if (type != null && !type.isEmpty()) {
+            sql.append(" AND assigned_to = ?");
+        }
+
+        // Фильтр по статусу
+        if (status != null && !status.equals("Все")) {
+            switch (status) {
+                case "Активные" -> sql.append(" AND status = 'ACTIVE'");
+                case "Выполненные" -> sql.append(" AND status = 'COMPLETED'");
+                case "Просроченные" ->
+                        sql.append(" AND status = 'ACTIVE' AND due_date < CURRENT_DATE");
+            }
+        }
+
+        // Фильтр по ключевому слову
+        if (keyword != null && !keyword.isBlank()) {
+            sql.append(" AND (LOWER(name) LIKE ? OR LOWER(description) LIKE ?)");
+        }
+
+        sql.append(" ORDER BY due_date, priority DESC");
+
+        try (PreparedStatement stmt = connection.prepareStatement(sql.toString())) {
+            int index = 1;
+            if (type != null && !type.isEmpty()) {
+                stmt.setString(index++, type);
+            }
+            if (keyword != null && !keyword.isBlank()) {
+                String kw = "%" + keyword.toLowerCase() + "%";
+                stmt.setString(index++, kw);
+                stmt.setString(index++, kw);
+            }
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    result.add(extractTaskFromResultSet(rs));
+                }
+            }
+        }
+
+        return result;
+    }
+
+    @Override
     public void close() throws SQLException {
         if (connection != null && !connection.isClosed()) {
             connection.close();
