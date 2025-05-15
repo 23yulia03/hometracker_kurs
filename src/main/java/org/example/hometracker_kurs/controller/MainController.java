@@ -37,17 +37,15 @@ public class MainController {
     @FXML private Label dataSourceLabel;
 
     public MainController() {
-
+        //пустой конструктор
     }
 
     @FXML
     public void initialize() {
-        initializeComboBoxes();  // Инициализация ComboBox
-        setupTableColumns();  // Настройка таблицы
-        setupStatusColumn();
 
-        // Отложить обновление просроченных задач после инициализации UI
-        javafx.application.Platform.runLater(this::updateOverdueTasks);
+        initializeComboBoxes();
+        setupTableColumns();
+        setupStatusColumn();
     }
 
     private void initializeComboBoxes() {
@@ -123,6 +121,8 @@ public class MainController {
         try {
             ObservableList<Task> tasks = taskService.getAllTasks();
             taskTable.setItems(tasks);
+            updateStatistics();
+            updateOverdueTasks();  // безопасно вызывать здесь
         } catch (SQLException e) {
             showAlert("Ошибка загрузки задач", e.getMessage());
             taskTable.setItems(FXCollections.observableArrayList());
@@ -162,13 +162,19 @@ public class MainController {
         }
     }
 
-    @FXML
-    private void deleteTask() {
+    private Task getSelectedTaskOrAlert(String action) {
         Task selected = taskTable.getSelectionModel().getSelectedItem();
         if (selected == null) {
-            showAlert("Ошибка", "Выберите задачу для удаления");
-            return;
+            showAlert("Ошибка", "Выберите задачу для " + action);
+            return null;
         }
+        return selected;
+    }
+
+    @FXML
+    private void deleteTask() {
+        Task selected = getSelectedTaskOrAlert("удаления");
+        if (selected == null) return;
 
         try {
             taskService.deleteTask(selected.getId());
@@ -180,16 +186,12 @@ public class MainController {
 
     @FXML
     private void completeTask() {
-        Task selected = taskTable.getSelectionModel().getSelectedItem();
-        if (selected == null) {
-            showAlert("Ошибка", "Выберите задачу для отметки");
-            return;
-        }
+        Task selected = getSelectedTaskOrAlert("выполнения");
+        if (selected == null) return;
 
         try {
             taskService.completeTask(selected.getId());
             refreshData();
-            taskTable.refresh();
         } catch (SQLException e) {
             showAlert("Ошибка выполнения", e.getMessage());
         }

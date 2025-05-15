@@ -10,19 +10,15 @@ import org.example.hometracker_kurs.model.TaskStatus;
 
 import java.sql.SQLException;
 import java.time.LocalDate;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Predicate;
+import java.util.concurrent.*;
 
 public class TaskService {
     private final TaskDAO taskDAO;
     private ScheduledExecutorService statusCheckScheduler;
 
     public TaskService(String daoType) {
-        Config config = new Config();
         try {
-            this.taskDAO = TaskDAOFactory.createTaskDAO(daoType, config);
+            this.taskDAO = TaskDAOFactory.createTaskDAO(daoType, new Config());
             startStatusChecker();
         } catch (SQLException e) {
             throw new RuntimeException("Не удалось создать DAO: " + e.getMessage(), e);
@@ -31,49 +27,47 @@ public class TaskService {
 
     private void startStatusChecker() {
         statusCheckScheduler = Executors.newSingleThreadScheduledExecutor();
-        statusCheckScheduler.scheduleAtFixedRate(this::checkOverdueTasks,
-                0, 24, TimeUnit.HOURS);
+        statusCheckScheduler.scheduleAtFixedRate(this::checkOverdueTasks, 0, 24, TimeUnit.HOURS);
     }
 
     public void checkOverdueTasks() {
         try {
             ObservableList<Task> tasks = taskDAO.getAllTasks();
-            tasks.stream()
-                    .filter(Task::isOverdue)
-                    .forEach(task -> {
-                        System.out.println("Просрочена задача: " + task);
-                    });
+            for (Task task : tasks) {
+                if (task.getStatus() == TaskStatus.ACTIVE &&
+                        task.getDueDate() != null &&
+                        task.getDueDate().isBefore(LocalDate.now())) {
+                    task.setStatus(TaskStatus.OVERDUE);
+                    taskDAO.updateTask(task);
+                }
+            }
         } catch (SQLException e) {
             System.err.println("Ошибка проверки просроченных задач: " + e.getMessage());
         }
     }
 
     public ObservableList<Task> getAllTasks() throws SQLException {
-        // Возвращаем новый список, чтобы TableView видел обновления
         return FXCollections.observableArrayList(taskDAO.getAllTasks());
     }
 
     public ObservableList<Task> getFilteredTasks(String type, String status, String searchText) throws SQLException {
         ObservableList<Task> allTasks = taskDAO.getAllTasks();
-        Predicate<Task> filter = t -> true;
-
-        if (type != null) {
-            filter = filter.and(t -> type.equals(t.getType()));
-        }
-
-        if (status != null) {
-            switch (status) {
-                case "Активные" -> filter = filter.and(t -> t.getStatus() == TaskStatus.ACTIVE);
-                case "Выполненные" -> filter = filter.and(t -> t.getStatus() == TaskStatus.COMPLETED);
-                case "Просроченные" -> filter = filter.and(t -> t.isOverdue());
+        return allTasks.filtered(task -> {
+            boolean matches = true;
+            if (type != null) matches &= type.equals(task.getType());
+            if (status != null) {
+                matches &= switch (status) {
+                    case "Активные" -> task.getStatus() == TaskStatus.ACTIVE;
+                    case "Выполненные" -> task.getStatus() == TaskStatus.COMPLETED;
+                    case "Просроченные" -> task.getStatus() == TaskStatus.OVERDUE;
+                    default -> true;
+                };
             }
-        }
+            if (searchText != null && !searchText.isBlank())
+                matches &= task.getName().toLowerCase().contains(searchText.toLowerCase());
 
-        if (searchText != null && !searchText.isBlank()) {
-            filter = filter.and(t -> t.getName().toLowerCase().contains(searchText.toLowerCase()));
-        }
-
-        return allTasks.filtered(filter::test);
+            return matches;
+        });
     }
 
     public void addTask(Task task) throws SQLException {
@@ -107,9 +101,7 @@ public class TaskService {
     }
 
     public void shutdown() {
-        if (statusCheckScheduler != null) {
-            statusCheckScheduler.shutdown();
-        }
+        if (statusCheckScheduler != null) statusCheckScheduler.shutdown();
         try {
             taskDAO.close();
         } catch (SQLException e) {
