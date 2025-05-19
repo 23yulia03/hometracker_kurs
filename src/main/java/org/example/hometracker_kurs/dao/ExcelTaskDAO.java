@@ -14,6 +14,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -42,8 +43,7 @@ public class ExcelTaskDAO implements TaskDAO {
             Sheet sheet = workbook.getSheetAt(0);
             Iterator<Row> rowIterator = sheet.iterator();
 
-            // Пропускаем заголовок
-            if (rowIterator.hasNext()) rowIterator.next();
+            if (rowIterator.hasNext()) rowIterator.next(); // Skip header
 
             while (rowIterator.hasNext()) {
                 Row row = rowIterator.next();
@@ -63,6 +63,73 @@ public class ExcelTaskDAO implements TaskDAO {
         }
     }
 
+    @Override
+    public ObservableList<Task> getFilteredTasks(
+            String type,
+            String status,
+            String keyword,
+            String sortField,
+            boolean ascending) throws SQLException {
+
+        Comparator<Task> comparator = getComparator(sortField, ascending);
+
+        return tasks.stream()
+                .filter(task -> {
+                    boolean matchesType = (type == null || type.isEmpty() || type.equals(task.getType()));
+                    boolean matchesStatus = switch (status) {
+                        case "Все" -> true;
+                        case null -> true;
+                        case "Активные" -> task.getStatus() == TaskStatus.ACTIVE;
+                        case "Выполненные" -> task.getStatus() == TaskStatus.COMPLETED;
+                        case "Просроченные" -> task.getStatus() == TaskStatus.OVERDUE;
+                        default -> false;
+                    };
+                    boolean matchesKeyword = (keyword == null || keyword.isBlank() ||
+                            task.getName().toLowerCase().contains(keyword.toLowerCase()) ||
+                            task.getDescription().toLowerCase().contains(keyword.toLowerCase()));
+                    return matchesType && matchesStatus && matchesKeyword;
+                })
+                .sorted(comparator)
+                .collect(FXCollections::observableArrayList, ObservableList::add, ObservableList::addAll);
+    }
+
+    private Comparator<Task> getComparator(String sortField, boolean ascending) {
+        Comparator<Task> comparator;
+
+        switch (sortField != null ? sortField : "") {
+            case "due_date":
+                // Сортировка по дате выполнения (учет null значений)
+                comparator = Comparator.comparing(
+                        Task::getDueDate,
+                        Comparator.nullsLast(Comparator.naturalOrder())
+                );
+                break;
+
+            case "priority":
+                // Сортировка по приоритету
+                comparator = Comparator.comparingInt(Task::getPriority);
+                break;
+
+            case "assigned_to":
+                // Сортировка по исполнителю (без учета регистра)
+                comparator = Comparator.comparing(
+                        Task::getAssignedTo,
+                        Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)
+                );
+                break;
+
+            default:
+                // Сортировка по умолчанию: сначала по дате, затем по приоритету
+                comparator = Comparator.comparing(
+                        Task::getDueDate,
+                        Comparator.nullsLast(Comparator.naturalOrder())
+                ).thenComparingInt(Task::getPriority);
+        }
+
+        // Применяем обратный порядок если нужно
+        return ascending ? comparator : comparator.reversed();
+    }
+
     private Task extractTaskFromRow(Row row) {
         try {
             int id = (int) row.getCell(0).getNumericCellValue();
@@ -71,10 +138,8 @@ public class ExcelTaskDAO implements TaskDAO {
 
             LocalDate dueDate = null;
             Cell dueDateCell = row.getCell(3);
-            if (dueDateCell != null) {
-                if (dueDateCell.getCellType() == CellType.NUMERIC) {
-                    dueDate = dueDateCell.getLocalDateTimeCellValue().toLocalDate();
-                }
+            if (dueDateCell != null && dueDateCell.getCellType() == CellType.NUMERIC) {
+                dueDate = dueDateCell.getLocalDateTimeCellValue().toLocalDate();
             }
 
             int priority = (int) row.getCell(4).getNumericCellValue();
@@ -89,8 +154,10 @@ public class ExcelTaskDAO implements TaskDAO {
 
             int frequencyDays = (int) row.getCell(8).getNumericCellValue();
 
-            return new Task(id, name, description, dueDate, priority,
+            Task task = new Task(id, name, description, dueDate, priority,
                     assignedTo, status, lastCompleted, frequencyDays);
+            task.setType(assignedTo); // Используем assignedTo как тип для совместимости
+            return task;
         } catch (Exception e) {
             logger.log(Level.WARNING, "Error extracting task from row: " + e.getMessage(), e);
             return null;
@@ -102,7 +169,7 @@ public class ExcelTaskDAO implements TaskDAO {
         if (cell.getCellType() == CellType.STRING) {
             return cell.getStringCellValue();
         } else if (cell.getCellType() == CellType.NUMERIC) {
-            return String.valueOf(cell.getNumericCellValue());
+            return String.valueOf((int) cell.getNumericCellValue());
         }
         return "";
     }
@@ -113,13 +180,11 @@ public class ExcelTaskDAO implements TaskDAO {
 
             Sheet sheet = workbook.createSheet("Tasks");
 
-            // Стиль для заголовков
             CellStyle headerStyle = workbook.createCellStyle();
             Font headerFont = workbook.createFont();
             headerFont.setBold(true);
             headerStyle.setFont(headerFont);
 
-            // Заголовки
             Row headerRow = sheet.createRow(0);
             String[] headers = {"ID", "Name", "Description", "Due Date", "Priority",
                     "Assigned To", "Status", "Last Completed", "Frequency Days"};
@@ -130,7 +195,6 @@ public class ExcelTaskDAO implements TaskDAO {
                 cell.setCellStyle(headerStyle);
             }
 
-            // Данные
             for (int i = 0; i < tasks.size(); i++) {
                 Row row = sheet.createRow(i + 1);
                 Task task = tasks.get(i);
@@ -154,7 +218,6 @@ public class ExcelTaskDAO implements TaskDAO {
                 row.createCell(8).setCellValue(task.getFrequencyDays());
             }
 
-            // Автоподбор ширины колонок
             for (int i = 0; i < headers.length; i++) {
                 sheet.autoSizeColumn(i);
             }
@@ -172,29 +235,6 @@ public class ExcelTaskDAO implements TaskDAO {
     }
 
     @Override
-    public ObservableList<Task> getFilteredTasks(String type, String status, String keyword) throws SQLException {
-        return tasks.stream()
-                .filter(task -> {
-                    boolean matchesType = (type == null || type.isEmpty() || type.equals(task.getType()));
-                    boolean matchesStatus = switch (status) {
-                        case "Все" -> true;
-                        case null -> true;
-                        case "Активные" -> task.getStatus() == TaskStatus.ACTIVE;
-                        case "Выполненные" -> task.getStatus() == TaskStatus.COMPLETED;
-                        case "Просроченные" -> task.getStatus() == TaskStatus.ACTIVE
-                                && task.getDueDate() != null
-                                && task.getDueDate().isBefore(LocalDate.now());
-                        default -> false;
-                    };
-                    boolean matchesKeyword = (keyword == null || keyword.isBlank() ||
-                            task.getName().toLowerCase().contains(keyword.toLowerCase()) ||
-                            task.getDescription().toLowerCase().contains(keyword.toLowerCase()));
-                    return matchesType && matchesStatus && matchesKeyword;
-                })
-                .collect(FXCollections::observableArrayList, ObservableList::add, ObservableList::addAll);
-    }
-
-    @Override
     public Task getTaskById(int id) throws SQLException {
         return tasks.stream()
                 .filter(task -> task.getId() == id)
@@ -204,9 +244,7 @@ public class ExcelTaskDAO implements TaskDAO {
 
     @Override
     public void addTask(Task task) throws SQLException {
-        if (task == null) {
-            throw new SQLException("Task cannot be null");
-        }
+        validateTask(task);
 
         if (tasks.stream().anyMatch(t -> t.getId() == task.getId())) {
             throw new SQLException("Task with id " + task.getId() + " already exists");
@@ -217,11 +255,27 @@ public class ExcelTaskDAO implements TaskDAO {
         saveToFile();
     }
 
-    @Override
-    public void updateTask(Task task) throws SQLException {
+    private void validateTask(Task task) throws SQLException {
         if (task == null) {
             throw new SQLException("Task cannot be null");
         }
+        if (task.getName() == null || task.getName().trim().isEmpty()) {
+            throw new SQLException("Task name cannot be empty");
+        }
+        if (task.getStatus() == null) {
+            throw new SQLException("Task status cannot be null");
+        }
+        if (task.getDueDate() != null && task.getDueDate().isBefore(LocalDate.now())) {
+            throw new SQLException("Due date cannot be in the past");
+        }
+        if (task.getPriority() < 1 || task.getPriority() > 5) {
+            throw new SQLException("Priority must be between 1 and 5");
+        }
+    }
+
+    @Override
+    public void updateTask(Task task) throws SQLException {
+        validateTask(task);
 
         Task existing = getTaskById(task.getId());
         existing.setName(task.getName());
@@ -229,7 +283,7 @@ public class ExcelTaskDAO implements TaskDAO {
         existing.setDueDate(task.getDueDate());
         existing.setPriority(task.getPriority());
         existing.setAssignedTo(task.getAssignedTo());
-        existing.setStatus(task.getStatus()); // Просто устанавливаем новый статус
+        existing.setStatus(task.getStatus());
         existing.setLastCompleted(task.getLastCompleted());
         existing.setFrequencyDays(task.getFrequencyDays());
 
@@ -290,14 +344,16 @@ public class ExcelTaskDAO implements TaskDAO {
 
     @Override
     public void markTaskAsCompleted(int id) throws SQLException {
-        Task task = getTaskById(id);
-        task.setStatus(TaskStatus.COMPLETED);
-        task.setLastCompleted(LocalDate.now());
-        saveToFile();
+        updateTaskStatus(id, TaskStatus.COMPLETED);
+    }
+
+    @Override
+    public ObservableList<Task> getFilteredTasks(String type, String status, String keyword) throws SQLException {
+        return null;
     }
 
     @Override
     public void close() throws SQLException {
-        // Для совместимости с интерфейсом, в Excel DAO не требуется закрытие ресурсов
+        // No resources to close for Excel
     }
 }

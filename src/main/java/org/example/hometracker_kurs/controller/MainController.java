@@ -1,5 +1,6 @@
 package org.example.hometracker_kurs.controller;
 
+import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
@@ -16,12 +17,16 @@ import java.util.Optional;
 public class MainController {
     private TaskService taskService;
 
+    // Элементы управления таблицей и фильтрами
     @FXML private TableView<Task> taskTable;
     @FXML private TableColumn<Task, TaskStatus> statusColumn;
     @FXML private ComboBox<String> taskTypeComboBox;
     @FXML private ComboBox<String> statusComboBox;
     @FXML private TextField searchField;
+    @FXML private ComboBox<String> sortFieldComboBox;
+    @FXML private ComboBox<String> sortOrderComboBox;
 
+    // Элементы формы редактирования
     @FXML private TextField nameField;
     @FXML private TextArea descriptionField;
     @FXML private DatePicker dueDatePicker;
@@ -29,46 +34,76 @@ public class MainController {
     @FXML private ComboBox<String> assigneeComboBox;
     @FXML private ComboBox<String> typeComboBox;
 
+    // Элементы статистики
     @FXML private Label totalTasksLabel;
     @FXML private Label activeTasksLabel;
     @FXML private Label completedTasksLabel;
     @FXML private Label overdueTasksLabel;
 
+    // Информация о источнике данных
     @FXML private Label dataSourceLabel;
 
     @FXML
     public void initialize() {
-
         initializeComboBoxes();
         setupTableColumns();
         setupStatusColumn();
+        initializeSortingControls();
     }
 
     private void initializeComboBoxes() {
-        // Инициализация ComboBox
+        // Инициализация ComboBox для приоритета
         priorityComboBox.setItems(FXCollections.observableArrayList(1, 2, 3, 4, 5));
-        priorityComboBox.setValue(3); // Устанавливаем значение по умолчанию
+        priorityComboBox.setValue(3);
 
-        assigneeComboBox.setItems(FXCollections.observableArrayList("Мама", "Папа", "Ребенок", "Другое"));
+        // Инициализация ComboBox для исполнителей
+        assigneeComboBox.setItems(FXCollections.observableArrayList(
+                "Мама", "Папа", "Ребенок", "Другое"));
+        assigneeComboBox.setValue("Мама");
 
-        typeComboBox.setItems(FXCollections.observableArrayList("Домашние дела", "Работа", "Личное", "Семья", "Покупки", "Здоровье"));
+        // Инициализация ComboBox для типов задач
+        typeComboBox.setItems(FXCollections.observableArrayList(
+                "Домашние дела", "Работа", "Личное", "Семья", "Покупки", "Здоровье"));
+        typeComboBox.setValue("Домашние дела");
 
-        taskTypeComboBox.setItems(FXCollections.observableArrayList("Все", "Домашние дела", "Работа", "Личное", "Семья", "Покупки", "Здоровье"));
+        // Инициализация ComboBox для фильтрации по типу
+        taskTypeComboBox.setItems(FXCollections.observableArrayList(
+                "Все", "Домашние дела", "Работа", "Личное", "Семья", "Покупки", "Здоровье"));
         taskTypeComboBox.setValue("Все");
 
-        statusComboBox.setItems(FXCollections.observableArrayList("Все", "Активные", "Выполненные", "Просроченные"));
+        // Инициализация ComboBox для фильтрации по статусу
+        statusComboBox.setItems(FXCollections.observableArrayList(
+                "Все", "Активные", "Выполненные", "Просроченные"));
         statusComboBox.setValue("Все");
     }
 
+    private void initializeSortingControls() {
+        // Инициализация ComboBox для выбора поля сортировки
+        sortFieldComboBox.setItems(FXCollections.observableArrayList(
+                "Без сортировки", "По дате", "По приоритету", "По категории"));
+        sortFieldComboBox.setValue("Без сортировки");
+
+        // Инициализация ComboBox для выбора направления сортировки
+        sortOrderComboBox.setItems(FXCollections.observableArrayList(
+                "По возрастанию", "По убыванию"));
+        sortOrderComboBox.setValue("По возрастанию");
+    }
+
     private void setupTableColumns() {
+        // Настройка политики изменения размера столбцов
         taskTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+
+        // Обработчик выбора задачи в таблице
         taskTable.getSelectionModel().selectedItemProperty().addListener(
                 (obs, oldSel, newSel) -> {
-                    if (newSel != null) fillFormWithSelectedTask(newSel);
+                    if (newSel != null) {
+                        fillFormWithSelectedTask(newSel);
+                    }
                 });
     }
 
     private void setupStatusColumn() {
+        // Настройка отображения статуса с цветами
         statusColumn.setCellFactory(col -> new TableCell<>() {
             @Override
             protected void updateItem(TaskStatus status, boolean empty) {
@@ -83,7 +118,7 @@ public class MainController {
                         case COMPLETED -> setTextFill(Color.BLUE);
                         case POSTPONED -> setTextFill(Color.ORANGE);
                         case CANCELLED -> setTextFill(Color.GRAY);
-                        case OVERDUE -> setTextFill(Color.RED);  // красный для просроченных
+                        case OVERDUE -> setTextFill(Color.RED);
                     }
                 }
             }
@@ -100,10 +135,7 @@ public class MainController {
             };
 
             this.taskService = new TaskService(daoKey);
-
-            // Обновляем метку с выбранным источником
             dataSourceLabel.setText("Выбранный источник данных: " + type);
-
             refreshData();
         } catch (Exception e) {
             showAlert("Ошибка источника", e.getMessage());
@@ -269,17 +301,28 @@ public class MainController {
     @FXML
     private void applyFilters() {
         if (taskService == null) return;
+
         try {
-            String type = taskTypeComboBox.getValue();
-            String status = statusComboBox.getValue();
-            String search = searchField.getText();
+            // Получаем параметры фильтрации
+            String type = "Все".equals(taskTypeComboBox.getValue()) ? null : taskTypeComboBox.getValue();
+            String status = "Все".equals(statusComboBox.getValue()) ? null : statusComboBox.getValue();
+            String keyword = searchField.getText().isBlank() ? null : searchField.getText();
 
+            // Преобразуем параметры сортировки в поля базы данных
+            String sortField = switch (sortFieldComboBox.getValue()) {
+                case "По дате" -> "due_date";
+                case "По приоритету" -> "priority";
+                case "По категории" -> "assigned_to";
+                default -> null;
+            };
+
+            boolean ascending = "По возрастанию".equals(sortOrderComboBox.getValue());
+
+            // Получаем отфильтрованные и отсортированные задачи
             ObservableList<Task> filtered = taskService.getFilteredTasks(
-                    "Все".equals(type) ? null : type,
-                    status,
-                    search.isBlank() ? null : search
-            );
+                    type, status, keyword, sortField, ascending);
 
+            // Обновляем таблицу
             taskTable.setItems(filtered);
             updateStatistics();
         } catch (SQLException e) {
@@ -289,12 +332,14 @@ public class MainController {
 
     @FXML
     private void resetFilters() {
-        // Сбрасываем значения фильтров к исходным
+        // Сбрасываем все фильтры
         taskTypeComboBox.setValue("Все");
         statusComboBox.setValue("Все");
         searchField.clear();
+        sortFieldComboBox.setValue("Без сортировки");
+        sortOrderComboBox.setValue("По возрастанию");
 
-        // Обновляем данные (показываем все задачи без фильтрации)
+        // Обновляем данные
         refreshData();
     }
 
@@ -367,12 +412,14 @@ public class MainController {
     private void updateOverdueTasks() {
         try {
             ObservableList<Task> tasks = taskService.getAllTasks();
-
             boolean updated = false;
 
             for (Task task : tasks) {
-                if (task.getStatus() == TaskStatus.ACTIVE && task.getDueDate() != null &&
-                        task.getDueDate().isBefore(LocalDate.now())) {
+                if (task.getStatus() == TaskStatus.ACTIVE &&
+                        task.getDueDate() != null &&
+                        task.getDueDate().isBefore(LocalDate.now()) &&
+                        task.getStatus() != TaskStatus.OVERDUE) {
+
                     task.setStatus(TaskStatus.OVERDUE);
                     taskService.updateTask(task);
                     updated = true;
@@ -380,10 +427,14 @@ public class MainController {
             }
 
             if (updated) {
-                refreshData();
+                Platform.runLater(() -> {
+                    refreshData();
+                    showAlert("Информация", "Статусы задач были обновлены (найдены просроченные)");
+                });
             }
         } catch (SQLException e) {
-            showAlert("Ошибка обновления статусов", e.getMessage());
+            Platform.runLater(() ->
+                    showAlert("Ошибка обновления статусов", e.getMessage()));
         }
     }
 

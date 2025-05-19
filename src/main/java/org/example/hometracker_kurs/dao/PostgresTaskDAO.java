@@ -51,7 +51,7 @@ public class PostgresTaskDAO implements TaskDAO {
                 due_date DATE,
                 priority INTEGER,
                 assigned_to VARCHAR(50),
-                status VARCHAR(20) NOT NULL CHECK (status IN ('ACTIVE', 'COMPLETED', 'POSTPONED', 'CANCELLED')),
+                status VARCHAR(20) NOT NULL CHECK (status IN ('ACTIVE', 'COMPLETED', 'POSTPONED', 'CANCELLED', 'OVERDUE')),
                 last_completed DATE,
                 frequency_days INTEGER,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -96,6 +96,68 @@ public class PostgresTaskDAO implements TaskDAO {
     }
 
     @Override
+    public ObservableList<Task> getFilteredTasks(
+            String type,
+            String status,
+            String keyword,
+            String sortField,
+            boolean ascending) throws SQLException {
+
+        ObservableList<Task> result = FXCollections.observableArrayList();
+        StringBuilder sql = new StringBuilder("SELECT * FROM tasks WHERE 1=1");
+
+        // Фильтрация по типу
+        if (type != null && !type.isEmpty()) {
+            sql.append(" AND assigned_to = ?");
+        }
+
+        // Фильтрация по статусу
+        if (status != null && !status.equals("Все")) {
+            switch (status) {
+                case "Активные" -> sql.append(" AND status = 'ACTIVE'");
+                case "Выполненные" -> sql.append(" AND status = 'COMPLETED'");
+                case "Просроченные" -> sql.append(" AND status = 'OVERDUE'");
+            }
+        }
+
+        // Поиск по ключевым словам
+        if (keyword != null && !keyword.isBlank()) {
+            sql.append(" AND (LOWER(name) LIKE ? OR LOWER(description) LIKE ?)");
+        }
+
+        // Сортировка
+        if (sortField != null && !sortField.isEmpty()) {
+            sql.append(" ORDER BY ").append(sortField);
+            sql.append(ascending ? " ASC" : " DESC");
+        } else {
+            // Сортировка по умолчанию
+            sql.append(" ORDER BY due_date, priority DESC");
+        }
+
+        try (PreparedStatement stmt = connection.prepareStatement(sql.toString())) {
+            int index = 1;
+
+            if (type != null && !type.isEmpty()) {
+                stmt.setString(index++, type);
+            }
+
+            if (keyword != null && !keyword.isBlank()) {
+                String kw = "%" + keyword.toLowerCase() + "%";
+                stmt.setString(index++, kw);
+                stmt.setString(index++, kw);
+            }
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    result.add(extractTaskFromResultSet(rs));
+                }
+            }
+        }
+
+        return result;
+    }
+
+    @Override
     public Task getTaskById(int id) throws SQLException {
         String sql = "SELECT * FROM tasks WHERE id = ?";
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
@@ -116,7 +178,7 @@ public class PostgresTaskDAO implements TaskDAO {
             INSERT INTO tasks 
             (name, description, due_date, priority, assigned_to, status, last_completed, frequency_days)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            RETURNING id, created_at, updated_at
+            RETURNING id
             """;
 
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
@@ -128,30 +190,6 @@ public class PostgresTaskDAO implements TaskDAO {
             }
         } catch (SQLException e) {
             logger.log(Level.SEVERE, "Error adding task", e);
-            throw e;
-        }
-    }
-
-    @Override
-    public void updateTask(Task task) throws SQLException {
-        validateTask(task);
-        String sql = """
-            UPDATE tasks SET 
-            name = ?, description = ?, due_date = ?, priority = ?, 
-            assigned_to = ?, status = ?, last_completed = ?, frequency_days = ?,
-            updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-            """;
-
-        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-            setTaskParameters(stmt, task);
-            stmt.setInt(9, task.getId());
-            int affectedRows = stmt.executeUpdate();
-            if (affectedRows == 0) {
-                throw new SQLException("Task not found with id: " + task.getId());
-            }
-        } catch (SQLException e) {
-            logger.log(Level.SEVERE, "Error updating task", e);
             throw e;
         }
     }
@@ -176,6 +214,36 @@ public class PostgresTaskDAO implements TaskDAO {
         }
         if (task.getStatus() == null) {
             throw new SQLException("Task status cannot be null");
+        }
+        if (task.getDueDate() != null && task.getDueDate().isBefore(LocalDate.now())) {
+            throw new SQLException("Due date cannot be in the past");
+        }
+        if (task.getPriority() < 1 || task.getPriority() > 5) {
+            throw new SQLException("Priority must be between 1 and 5");
+        }
+    }
+
+    @Override
+    public void updateTask(Task task) throws SQLException {
+        validateTask(task);
+        String sql = """
+            UPDATE tasks SET 
+            name = ?, description = ?, due_date = ?, priority = ?, 
+            assigned_to = ?, status = ?, last_completed = ?, frequency_days = ?,
+            updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """;
+
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            setTaskParameters(stmt, task);
+            stmt.setInt(9, task.getId());
+            int affectedRows = stmt.executeUpdate();
+            if (affectedRows == 0) {
+                throw new SQLException("Task not found with id: " + task.getId());
+            }
+        } catch (SQLException e) {
+            logger.log(Level.SEVERE, "Error updating task", e);
+            throw e;
         }
     }
 
@@ -286,11 +354,11 @@ public class PostgresTaskDAO implements TaskDAO {
             sql.append(" AND assigned_to = ?");
         }
 
-        if (status != null && !status.equals("���")) {
+        if (status != null && !status.equals("���")) {
             switch (status) {
-                case "��������" -> sql.append(" AND status = 'ACTIVE'");
-                case "�����������" -> sql.append(" AND status = 'COMPLETED'");
-                case "������������" ->
+                case "��������" -> sql.append(" AND status = 'ACTIVE'");
+                case "�����������" -> sql.append(" AND status = 'COMPLETED'");
+                case "������������" ->
                         sql.append(" AND status = 'ACTIVE' AND due_date < CURRENT_DATE");
             }
         }

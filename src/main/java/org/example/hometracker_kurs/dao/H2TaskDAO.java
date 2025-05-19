@@ -8,16 +8,12 @@ import org.example.hometracker_kurs.model.TaskStatus;
 
 import java.sql.*;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class H2TaskDAO implements TaskDAO {
     private static final Logger logger = Logger.getLogger(H2TaskDAO.class.getName());
     private final Connection connection;
-    private final List<Task> tasks = new ArrayList<>();
-    private int nextId = 1;
 
     public H2TaskDAO(Config config) throws SQLException {
         this.connection = DriverManager.getConnection(config.getH2Url());
@@ -25,16 +21,19 @@ public class H2TaskDAO implements TaskDAO {
     }
 
     private void createTable() throws SQLException {
-        String sql = "CREATE TABLE IF NOT EXISTS tasks (" +
-                "id INT PRIMARY KEY, " +
-                "name VARCHAR(100) NOT NULL, " +
-                "description TEXT, " +
-                "due_date DATE, " +
-                "priority INT, " +
-                "assigned_to VARCHAR(50), " +
-                "status VARCHAR(20) NOT NULL CHECK (status IN ('ACTIVE', 'COMPLETED', 'POSTPONED', 'CANCELLED')), " +
-                "last_completed DATE, " +
-                "frequency_days INT)";
+        String sql = """
+            CREATE TABLE IF NOT EXISTS tasks (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                description TEXT,
+                due_date DATE,
+                priority INTEGER,
+                assigned_to VARCHAR(50),
+                status VARCHAR(20) NOT NULL CHECK (status IN ('ACTIVE', 'COMPLETED', 'POSTPONED', 'CANCELLED', 'OVERDUE')),
+                last_completed DATE,
+                frequency_days INTEGER
+            )
+            """;
 
         try (Statement stmt = connection.createStatement()) {
             stmt.execute(sql);
@@ -52,6 +51,69 @@ public class H2TaskDAO implements TaskDAO {
                 result.add(extractTaskFromResultSet(rs));
             }
         }
+        return result;
+    }
+
+    @Override
+    public ObservableList<Task> getFilteredTasks(
+            String type,
+            String status,
+            String keyword,
+            String sortField,
+            boolean ascending) throws SQLException {
+
+        ObservableList<Task> result = FXCollections.observableArrayList();
+        StringBuilder sql = new StringBuilder("SELECT * FROM tasks WHERE 1=1");
+
+        // Фильтрация по типу
+        if (type != null && !type.isEmpty()) {
+            sql.append(" AND assigned_to = ?");
+        }
+
+        // Фильтрация по статусу
+        if (status != null && !status.equals("Все")) {
+            switch (status) {
+                case "Активные" -> sql.append(" AND status = 'ACTIVE'");
+                case "Выполненные" -> sql.append(" AND status = 'COMPLETED'");
+                case "Просроченные" -> sql.append(" AND status = 'OVERDUE'");
+                default -> {}
+            }
+        }
+
+        // Поиск по ключевым словам
+        if (keyword != null && !keyword.isBlank()) {
+            sql.append(" AND (LOWER(name) LIKE ? OR LOWER(description) LIKE ?)");
+        }
+
+        // Сортировка
+        if (sortField != null && !sortField.isEmpty()) {
+            sql.append(" ORDER BY ").append(sortField);
+            sql.append(ascending ? " ASC" : " DESC");
+        } else {
+            // Сортировка по умолчанию
+            sql.append(" ORDER BY due_date, priority DESC");
+        }
+
+        try (PreparedStatement stmt = connection.prepareStatement(sql.toString())) {
+            int index = 1;
+
+            if (type != null && !type.isEmpty()) {
+                stmt.setString(index++, type);
+            }
+
+            if (keyword != null && !keyword.isBlank()) {
+                String kw = "%" + keyword.toLowerCase() + "%";
+                stmt.setString(index++, kw);
+                stmt.setString(index++, kw);
+            }
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    result.add(extractTaskFromResultSet(rs));
+                }
+            }
+        }
+
         return result;
     }
 
@@ -123,6 +185,24 @@ public class H2TaskDAO implements TaskDAO {
         } catch (SQLException e) {
             logger.log(Level.SEVERE, "Error updating task", e);
             throw e;
+        }
+    }
+
+    private void validateTask(Task task) throws SQLException {
+        if (task == null) {
+            throw new SQLException("Задача не может быть null");
+        }
+        if (task.getName() == null || task.getName().trim().isEmpty()) {
+            throw new SQLException("Название задачи не может быть пустым");
+        }
+        if (task.getStatus() == null) {
+            throw new SQLException("Статус задачи не может быть null");
+        }
+        if (task.getDueDate() != null && task.getDueDate().isBefore(LocalDate.now())) {
+            throw new SQLException("Дата выполнения не может быть в прошлом");
+        }
+        if (task.getPriority() < 1 || task.getPriority() > 5) {
+            throw new SQLException("Приоритет должен быть между 1 и 5");
         }
     }
 
@@ -213,63 +293,13 @@ public class H2TaskDAO implements TaskDAO {
 
     @Override
     public ObservableList<Task> getFilteredTasks(String type, String status, String keyword) throws SQLException {
-        ObservableList<Task> result = FXCollections.observableArrayList();
-        StringBuilder sql = new StringBuilder("SELECT * FROM tasks WHERE 1=1");
-
-        if (type != null && !type.isEmpty()) {
-            sql.append(" AND assigned_to = ?");
-        }
-
-        if (status != null && !status.equals("���")) {
-            switch (status) {
-                case "��������" -> sql.append(" AND status = 'ACTIVE'");
-                case "�����������" -> sql.append(" AND status = 'COMPLETED'");
-                case "������������" ->
-                        sql.append(" AND status = 'ACTIVE' AND due_date < CURRENT_DATE");
-            }
-        }
-
-        if (keyword != null && !keyword.isBlank()) {
-            sql.append(" AND (LOWER(name) LIKE ? OR LOWER(description) LIKE ?)");
-        }
-
-        try (PreparedStatement stmt = connection.prepareStatement(sql.toString())) {
-            int index = 1;
-            if (type != null && !type.isEmpty()) {
-                stmt.setString(index++, type);
-            }
-            if (keyword != null && !keyword.isBlank()) {
-                String kw = "%" + keyword.toLowerCase() + "%";
-                stmt.setString(index++, kw);
-                stmt.setString(index++, kw);
-            }
-
-            try (ResultSet rs = stmt.executeQuery()) {
-                while (rs.next()) {
-                    result.add(extractTaskFromResultSet(rs));
-                }
-            }
-        }
-
-        return result;
+        return null;
     }
 
     @Override
     public void close() throws SQLException {
         if (connection != null && !connection.isClosed()) {
             connection.close();
-        }
-    }
-
-    private void validateTask(Task task) throws SQLException {
-        if (task == null) {
-            throw new SQLException("������ �� ����� ���� ������");
-        }
-        if (task.getName() == null || task.getName().trim().isEmpty()) {
-            throw new SQLException("��� ������ �� ����� ���� ������");
-        }
-        if (task.getStatus() == null) {
-            throw new SQLException("������ ������ �� ����� ���� ������");
         }
     }
 }

@@ -2,8 +2,6 @@ package org.example.hometracker_kurs.model;
 
 import java.time.LocalDate;
 
-import org.example.hometracker_kurs.model.TaskStatus;
-
 public class Task {
     private int id;
     private String name;
@@ -66,9 +64,15 @@ public class Task {
     }
 
     public boolean isOverdue() {
-        return status == TaskStatus.ACTIVE &&
+        return (status == TaskStatus.ACTIVE || status == TaskStatus.POSTPONED) &&
                 dueDate != null &&
                 dueDate.isBefore(LocalDate.now());
+    }
+
+    public void checkStatus() {
+        if (isOverdue() && status != TaskStatus.OVERDUE) {
+            this.status = TaskStatus.OVERDUE;
+        }
     }
 
     public boolean needsCompletionReminder() {

@@ -33,13 +33,23 @@ public class TaskService {
     public void checkOverdueTasks() {
         try {
             ObservableList<Task> tasks = taskDAO.getAllTasks();
+            boolean needsRefresh = false;
+
             for (Task task : tasks) {
                 if (task.getStatus() == TaskStatus.ACTIVE &&
                         task.getDueDate() != null &&
                         task.getDueDate().isBefore(LocalDate.now())) {
-                    task.setStatus(TaskStatus.OVERDUE);
-                    taskDAO.updateTask(task);
+
+                    if (task.getStatus() != TaskStatus.OVERDUE) {
+                        task.setStatus(TaskStatus.OVERDUE);
+                        taskDAO.updateTask(task);
+                        needsRefresh = true;
+                    }
                 }
+            }
+
+            if (needsRefresh) {
+                System.out.println("Обновлены статусы просроченных задач");
             }
         } catch (SQLException e) {
             System.err.println("Ошибка проверки просроченных задач: " + e.getMessage());
@@ -50,32 +60,46 @@ public class TaskService {
         return FXCollections.observableArrayList(taskDAO.getAllTasks());
     }
 
-    public ObservableList<Task> getFilteredTasks(String type, String status, String searchText) throws SQLException {
-        ObservableList<Task> allTasks = taskDAO.getAllTasks();
-        return allTasks.filtered(task -> {
-            boolean matches = true;
-            if (type != null) matches &= type.equals(task.getType());
-            if (status != null) {
-                matches &= switch (status) {
-                    case "Активные" -> task.getStatus() == TaskStatus.ACTIVE;
-                    case "Выполненные" -> task.getStatus() == TaskStatus.COMPLETED;
-                    case "Просроченные" -> task.getStatus() == TaskStatus.OVERDUE;
-                    default -> true;
-                };
-            }
-            if (searchText != null && !searchText.isBlank())
-                matches &= task.getName().toLowerCase().contains(searchText.toLowerCase());
+    public ObservableList<Task> getFilteredTasks(
+            String type,
+            String status,
+            String searchText,
+            String sortField,
+            boolean ascending) throws SQLException {
 
-            return matches;
-        });
+        return taskDAO.getFilteredTasks(type, status, searchText, sortField, ascending);
+    }
+
+    public ObservableList<Task> getTasksSortedBy(String sortField, boolean ascending) throws SQLException {
+        return taskDAO.getFilteredTasks(null, null, null, sortField, ascending);
     }
 
     public void addTask(Task task) throws SQLException {
+        validateTask(task);
         taskDAO.addTask(task);
     }
 
     public void updateTask(Task task) throws SQLException {
+        validateTask(task);
         taskDAO.updateTask(task);
+    }
+
+    private void validateTask(Task task) throws SQLException {
+        if (task == null) {
+            throw new SQLException("Задача не может быть null");
+        }
+        if (task.getName() == null || task.getName().trim().isEmpty()) {
+            throw new SQLException("Название задачи не может быть пустым");
+        }
+        if (task.getStatus() == null) {
+            throw new SQLException("Статус задачи не может быть null");
+        }
+        if (task.getDueDate() != null && task.getDueDate().isBefore(LocalDate.now())) {
+            throw new SQLException("Дата выполнения не может быть в прошлом");
+        }
+        if (task.getPriority() < 1 || task.getPriority() > 5) {
+            throw new SQLException("Приоритет должен быть между 1 и 5");
+        }
     }
 
     public void deleteTask(int id) throws SQLException {
