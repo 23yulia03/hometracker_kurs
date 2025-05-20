@@ -63,29 +63,6 @@ public class Task {
         this.status = newStatus;
     }
 
-    public boolean isOverdue() {
-        return (status == TaskStatus.ACTIVE || status == TaskStatus.POSTPONED) &&
-                dueDate != null &&
-                dueDate.isBefore(LocalDate.now());
-    }
-
-    public void checkStatus() {
-        if (isOverdue() && status != TaskStatus.OVERDUE) {
-            this.status = TaskStatus.OVERDUE;
-        }
-    }
-
-    public boolean needsCompletionReminder() {
-        return status == TaskStatus.ACTIVE &&
-                dueDate != null &&
-                dueDate.isBefore(LocalDate.now().plusDays(3));
-    }
-
-    public void markCompleted() {
-        setStatus(TaskStatus.COMPLETED);
-        this.lastCompleted = LocalDate.now();
-    }
-
     public void postpone(int days) {
         if (dueDate != null) {
             this.dueDate = dueDate.plusDays(days);
@@ -95,31 +72,9 @@ public class Task {
         }
     }
 
-    public void cancel() {
-        setStatus(TaskStatus.CANCELLED);
-    }
-
-    public void reactivate() {
-        setStatus(TaskStatus.ACTIVE);
-    }
-
     @Override
     public String toString() {
         return String.format("%s [%s, %s]", name, status.getDisplayName(),
                 dueDate != null ? dueDate.toString() : "нет срока");
-    }
-
-    public Task copy() {
-        return new Task(
-                this.id,
-                this.name,
-                this.description,
-                this.dueDate,
-                this.priority,
-                this.assignedTo,
-                this.status,
-                this.lastCompleted,
-                this.frequencyDays
-        );
     }
 }

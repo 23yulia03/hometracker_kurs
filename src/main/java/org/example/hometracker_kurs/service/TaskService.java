@@ -70,10 +70,6 @@ public class TaskService {
         return taskDAO.getFilteredTasks(type, status, searchText, sortField, ascending);
     }
 
-    public ObservableList<Task> getTasksSortedBy(String sortField, boolean ascending) throws SQLException {
-        return taskDAO.getFilteredTasks(null, null, null, sortField, ascending);
-    }
-
     public void addTask(Task task) throws SQLException {
         validateTask(task);
         taskDAO.addTask(task);
@@ -116,20 +112,7 @@ public class TaskService {
         taskDAO.updateTask(task);
     }
 
-    public void cancelTask(int id) throws SQLException {
-        taskDAO.updateTaskStatus(id, TaskStatus.CANCELLED);
-    }
-
     public void reactivateTask(int id) throws SQLException {
         taskDAO.updateTaskStatus(id, TaskStatus.ACTIVE);
-    }
-
-    public void shutdown() {
-        if (statusCheckScheduler != null) statusCheckScheduler.shutdown();
-        try {
-            taskDAO.close();
-        } catch (SQLException e) {
-            System.err.println("Ошибка закрытия DAO: " + e.getMessage());
-        }
     }
 }

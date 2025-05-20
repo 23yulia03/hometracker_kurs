@@ -263,50 +263,6 @@ public class PostgresTaskDAO implements TaskDAO {
     }
 
     @Override
-    public ObservableList<Task> getTasksByAssignee(String assignee) throws SQLException {
-        if (assignee == null || assignee.trim().isEmpty()) {
-            throw new SQLException("Assignee cannot be empty");
-        }
-
-        ObservableList<Task> tasks = FXCollections.observableArrayList();
-        String sql = "SELECT * FROM tasks WHERE assigned_to = ? ORDER BY due_date";
-
-        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-            stmt.setString(1, assignee);
-            try (ResultSet rs = stmt.executeQuery()) {
-                while (rs.next()) {
-                    tasks.add(extractTaskFromResultSet(rs));
-                }
-            }
-        }
-        return tasks;
-    }
-
-    @Override
-    public ObservableList<Task> getTasksDueBetween(LocalDate start, LocalDate end) throws SQLException {
-        if (start == null || end == null) {
-            throw new SQLException("Start and end dates cannot be null");
-        }
-        if (start.isAfter(end)) {
-            throw new SQLException("Start date cannot be after end date");
-        }
-
-        ObservableList<Task> tasks = FXCollections.observableArrayList();
-        String sql = "SELECT * FROM tasks WHERE due_date BETWEEN ? AND ? ORDER BY due_date";
-
-        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-            stmt.setDate(1, Date.valueOf(start));
-            stmt.setDate(2, Date.valueOf(end));
-            try (ResultSet rs = stmt.executeQuery()) {
-                while (rs.next()) {
-                    tasks.add(extractTaskFromResultSet(rs));
-                }
-            }
-        }
-        return tasks;
-    }
-
-    @Override
     public void updateTaskStatus(int id, TaskStatus status) throws SQLException {
         if (status == null) {
             throw new SQLException("Status cannot be null");
@@ -343,51 +299,6 @@ public class PostgresTaskDAO implements TaskDAO {
     @Override
     public void markTaskAsCompleted(int id) throws SQLException {
         updateTaskStatus(id, TaskStatus.COMPLETED);
-    }
-
-    @Override
-    public ObservableList<Task> getFilteredTasks(String type, String status, String keyword) throws SQLException {
-        ObservableList<Task> result = FXCollections.observableArrayList();
-        StringBuilder sql = new StringBuilder("SELECT * FROM tasks WHERE 1=1");
-
-        if (type != null && !type.isEmpty()) {
-            sql.append(" AND assigned_to = ?");
-        }
-
-        if (status != null && !status.equals("���")) {
-            switch (status) {
-                case "��������" -> sql.append(" AND status = 'ACTIVE'");
-                case "�����������" -> sql.append(" AND status = 'COMPLETED'");
-                case "������������" ->
-                        sql.append(" AND status = 'ACTIVE' AND due_date < CURRENT_DATE");
-            }
-        }
-
-        if (keyword != null && !keyword.isBlank()) {
-            sql.append(" AND (LOWER(name) LIKE ? OR LOWER(description) LIKE ?)");
-        }
-
-        sql.append(" ORDER BY due_date, priority DESC");
-
-        try (PreparedStatement stmt = connection.prepareStatement(sql.toString())) {
-            int index = 1;
-            if (type != null && !type.isEmpty()) {
-                stmt.setString(index++, type);
-            }
-            if (keyword != null && !keyword.isBlank()) {
-                String kw = "%" + keyword.toLowerCase() + "%";
-                stmt.setString(index++, kw);
-                stmt.setString(index++, kw);
-            }
-
-            try (ResultSet rs = stmt.executeQuery()) {
-                while (rs.next()) {
-                    result.add(extractTaskFromResultSet(rs));
-                }
-            }
-        }
-
-        return result;
     }
 
     @Override

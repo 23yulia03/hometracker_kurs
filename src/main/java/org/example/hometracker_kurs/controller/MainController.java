@@ -40,7 +40,7 @@ public class MainController {
     @FXML private Label completedTasksLabel;
     @FXML private Label overdueTasksLabel;
 
-    // Информация о источнике данных
+    // Информация об источнике данных
     @FXML private Label dataSourceLabel;
 
     @FXML
@@ -220,6 +220,7 @@ public class MainController {
         try {
             taskService.completeTask(selected.getId());
             refreshData();
+            taskTable.refresh();
         } catch (SQLException e) {
             showAlert("Ошибка выполнения", e.getMessage());
         }
@@ -260,24 +261,6 @@ public class MainController {
                 showAlert("Ошибка", e.getMessage());
             }
         });
-    }
-
-    @FXML
-    private void cancelTask() {
-        Task selected = taskTable.getSelectionModel().getSelectedItem();
-        if (selected == null) {
-            showAlert("Ошибка", "Выберите задачу для отмены");
-            return;
-        }
-
-        try {
-            taskService.cancelTask(selected.getId());
-            refreshData();
-            taskTable.refresh();
-            showAlert("Успех", "Задача отменена");
-        } catch (SQLException e) {
-            showAlert("Ошибка", "Не удалось отменить задачу: " + e.getMessage());
-        }
     }
 
     @FXML

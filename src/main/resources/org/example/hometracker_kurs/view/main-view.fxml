@@ -153,7 +153,6 @@
     <Button onAction="#deleteTask" style="-fx-background-color: #f44336; -fx-text-fill: white; -fx-font-weight: bold;" text="Удалить" />
     <Button onAction="#completeTask" style="-fx-background-color: #673AB7; -fx-text-fill: white; -fx-font-weight: bold;" text="Отметить выполненной" />
     <Button onAction="#postponeTask" style="-fx-background-color: #FFC107; -fx-text-fill: black;" text="Отложить" />
-    <Button onAction="#cancelTask" style="-fx-background-color: #607D8B; -fx-text-fill: white;" text="Отменить" />
     <Button onAction="#reactivateTask" style="-fx-background-color: #00BCD4; -fx-text-fill: white;" text="Активировать" />
   </HBox>
 

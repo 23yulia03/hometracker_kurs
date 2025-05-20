@@ -222,50 +222,6 @@ public class H2TaskDAO implements TaskDAO {
     }
 
     @Override
-    public ObservableList<Task> getTasksByAssignee(String assignee) throws SQLException {
-        if (assignee == null || assignee.trim().isEmpty()) {
-            throw new SQLException("Assignee cannot be empty");
-        }
-
-        ObservableList<Task> result = FXCollections.observableArrayList();
-        String sql = "SELECT * FROM tasks WHERE assigned_to = ?";
-
-        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-            stmt.setString(1, assignee);
-            try (ResultSet rs = stmt.executeQuery()) {
-                while (rs.next()) {
-                    result.add(extractTaskFromResultSet(rs));
-                }
-            }
-        }
-        return result;
-    }
-
-    @Override
-    public ObservableList<Task> getTasksDueBetween(LocalDate start, LocalDate end) throws SQLException {
-        if (start == null || end == null) {
-            throw new SQLException("Start and end dates cannot be null");
-        }
-        if (start.isAfter(end)) {
-            throw new SQLException("Start date cannot be after end date");
-        }
-
-        ObservableList<Task> result = FXCollections.observableArrayList();
-        String sql = "SELECT * FROM tasks WHERE due_date BETWEEN ? AND ?";
-
-        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-            stmt.setDate(1, Date.valueOf(start));
-            stmt.setDate(2, Date.valueOf(end));
-            try (ResultSet rs = stmt.executeQuery()) {
-                while (rs.next()) {
-                    result.add(extractTaskFromResultSet(rs));
-                }
-            }
-        }
-        return result;
-    }
-
-    @Override
     public void updateTaskStatus(int id, TaskStatus status) throws SQLException {
         if (status == null) {
             throw new SQLException("Status cannot be null");
@@ -289,11 +245,6 @@ public class H2TaskDAO implements TaskDAO {
     @Override
     public void markTaskAsCompleted(int id) throws SQLException {
         updateTaskStatus(id, TaskStatus.COMPLETED);
-    }
-
-    @Override
-    public ObservableList<Task> getFilteredTasks(String type, String status, String keyword) throws SQLException {
-        return null;
     }
 
     @Override

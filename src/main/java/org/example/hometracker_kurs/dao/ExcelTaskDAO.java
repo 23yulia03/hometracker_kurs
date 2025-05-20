@@ -298,37 +298,6 @@ public class ExcelTaskDAO implements TaskDAO {
         saveToFile();
     }
 
-    @Override
-    public ObservableList<Task> getTasksByAssignee(String assignee) throws SQLException {
-        if (assignee == null || assignee.trim().isEmpty()) {
-            throw new SQLException("Assignee cannot be empty");
-        }
-
-        return tasks.stream()
-                .filter(task -> assignee.equals(task.getAssignedTo()))
-                .collect(FXCollections::observableArrayList,
-                        ObservableList::add,
-                        ObservableList::addAll);
-    }
-
-    @Override
-    public ObservableList<Task> getTasksDueBetween(LocalDate start, LocalDate end) throws SQLException {
-        if (start == null || end == null) {
-            throw new SQLException("Start and end dates cannot be null");
-        }
-
-        if (start.isAfter(end)) {
-            throw new SQLException("Start date cannot be after end date");
-        }
-
-        return tasks.stream()
-                .filter(task -> task.getDueDate() != null &&
-                        !task.getDueDate().isBefore(start) &&
-                        !task.getDueDate().isAfter(end))
-                .collect(FXCollections::observableArrayList,
-                        ObservableList::add,
-                        ObservableList::addAll);
-    }
 
     @Override
     public void updateTaskStatus(int id, TaskStatus status) throws SQLException {
@@ -347,10 +316,6 @@ public class ExcelTaskDAO implements TaskDAO {
         updateTaskStatus(id, TaskStatus.COMPLETED);
     }
 
-    @Override
-    public ObservableList<Task> getFilteredTasks(String type, String status, String keyword) throws SQLException {
-        return null;
-    }
 
     @Override
     public void close() throws SQLException {

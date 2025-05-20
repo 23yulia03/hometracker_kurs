@@ -5,7 +5,6 @@ import org.example.hometracker_kurs.model.Task;
 import org.example.hometracker_kurs.model.TaskStatus;
 
 import java.sql.SQLException;
-import java.time.LocalDate;
 
 public interface TaskDAO {
     ObservableList<Task> getAllTasks() throws SQLException;
@@ -13,8 +12,6 @@ public interface TaskDAO {
     void addTask(Task task) throws SQLException;
     void updateTask(Task task) throws SQLException;
     void deleteTask(int id) throws SQLException;
-    ObservableList<Task> getTasksByAssignee(String assignee) throws SQLException;
-    ObservableList<Task> getTasksDueBetween(LocalDate start, LocalDate end) throws SQLException;
 
     ObservableList<Task> getFilteredTasks(
             String type,
@@ -26,8 +23,6 @@ public interface TaskDAO {
 
     void updateTaskStatus(int id, TaskStatus status) throws SQLException;
     void markTaskAsCompleted(int id) throws SQLException;
-
-    ObservableList<Task> getFilteredTasks(String type, String status, String keyword) throws SQLException;
 
     void close() throws SQLException;
 }
