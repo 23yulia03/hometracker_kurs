@@ -13,8 +13,11 @@ import org.example.hometracker_kurs.service.TaskService;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.Optional;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class MainController {
+    private final Logger logger = Logger.getLogger(getClass().getName());
     private TaskService taskService;
 
     // Элементы управления таблицей и фильтрами
@@ -25,6 +28,7 @@ public class MainController {
     @FXML private TextField searchField;
     @FXML private ComboBox<String> sortFieldComboBox;
     @FXML private ComboBox<String> sortOrderComboBox;
+    @FXML private ComboBox<String> dataSourceComboBox;
 
     // Элементы формы редактирования
     @FXML private TextField nameField;
@@ -63,12 +67,12 @@ public class MainController {
 
         // Инициализация ComboBox для типов задач
         typeComboBox.setItems(FXCollections.observableArrayList(
-                "Домашние дела", "Работа", "Личное", "Семья", "Покупки", "Здоровье"));
-        typeComboBox.setValue("Домашние дела");
+                "Уборка", "Покупки", "Приготовление еды", "Сад и огород", "Ремонт и обслуживание", "Финансы", "Здоровье", "Хобби и личное", "Прочее"));
+        typeComboBox.setValue("Уборка");
 
         // Инициализация ComboBox для фильтрации по типу
         taskTypeComboBox.setItems(FXCollections.observableArrayList(
-                "Все", "Домашние дела", "Работа", "Личное", "Семья", "Покупки", "Здоровье"));
+                "Уборка", "Покупки", "Приготовление еды", "Сад и огород", "Ремонт и обслуживание", "Финансы", "Здоровье", "Хобби и личное", "Прочее"));
         taskTypeComboBox.setValue("Все");
 
         // Инициализация ComboBox для фильтрации по статусу
@@ -423,14 +427,37 @@ public class MainController {
 
     @FXML
     private void switchDataSource() {
-        String currentLabel = dataSourceLabel.getText();
-        String currentSource = currentLabel.replace("Выбранный источник данных: ", "");
+        String selectedSource = dataSourceComboBox.getValue();
+        if (selectedSource == null) {
+            showAlert("Ошибка", "Выберите источник данных");
+            return;
+        }
 
-        switch (currentSource) {
-            case "Excel" -> setDataSource("Excel");
-            case "PostgreSQL" -> setDataSource("PostgreSQL");
-            case "H2 Database" -> setDataSource("H2 Database");
-            default -> setDataSource("Excel");
+        try {
+            String daoKey = switch (selectedSource) {
+                case "PostgreSQL" -> "postgres";
+                case "Excel" -> "excel";
+                case "H2 Database" -> "h2";
+                default -> throw new IllegalArgumentException("Неизвестный источник: " + selectedSource);
+            };
+
+            // Закрываем предыдущее подключение, если оно есть
+            if (this.taskService != null) {
+                try {
+                    this.taskService.close();
+                } catch (SQLException e) {
+                    logger.log(Level.WARNING, "Ошибка при закрытии подключения", e);
+                }
+            }
+
+            // Создаем новый сервис с выбранным DAO
+            this.taskService = new TaskService(daoKey);
+            dataSourceLabel.setText("Выбранный источник данных: " + selectedSource);
+            refreshData();
+        } catch (Exception e) {
+            showAlert("Ошибка источника", e.getMessage());
+            taskTable.setItems(FXCollections.observableArrayList());
+            dataSourceLabel.setText("Ошибка подключения");
         }
     }
 

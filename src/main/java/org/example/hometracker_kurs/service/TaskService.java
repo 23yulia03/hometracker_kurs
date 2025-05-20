@@ -115,4 +115,13 @@ public class TaskService {
     public void reactivateTask(int id) throws SQLException {
         taskDAO.updateTaskStatus(id, TaskStatus.ACTIVE);
     }
+
+    public void close() throws SQLException {
+        if (taskDAO != null) {
+            taskDAO.close();
+        }
+        if (statusCheckScheduler != null) {
+            statusCheckScheduler.shutdown();
+        }
+    }
 }

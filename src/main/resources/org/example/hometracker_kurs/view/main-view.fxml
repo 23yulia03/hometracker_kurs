@@ -35,9 +35,15 @@
       <items>
         <FXCollections fx:factory="observableArrayList">
           <String fx:value="Все" />
-          <String fx:value="Домашние дела" />
-          <String fx:value="Работа" />
-          <String fx:value="Личное" />
+          <String fx:value="Уборка" />
+          <String fx:value="Покупки" />
+          <String fx:value="Приготовление еды" />
+          <String fx:value="Сад и огород" />
+          <String fx:value="Ремонт и обслуживание" />
+          <String fx:value="Финансы" />
+          <String fx:value="Здоровье" />
+          <String fx:value="Хобби и личное" />
+          <String fx:value="Прочее" />
         </FXCollections>
       </items>
     </ComboBox>
@@ -67,7 +73,7 @@
         </FXCollections>
       </items>
     </ComboBox>
-    <ComboBox fx:id="sortOrderComboBox" prefWidth="120">
+    <ComboBox fx:id="sortOrderComboBox" prefHeight="26.0" prefWidth="159.0">
       <items>
         <FXCollections fx:factory="observableArrayList">
           <String fx:value="По возрастанию" />
@@ -103,6 +109,11 @@
       <TableColumn prefWidth="150" text="Исполнитель">
         <cellValueFactory>
           <PropertyValueFactory property="assignedTo" />
+        </cellValueFactory>
+      </TableColumn>
+      <TableColumn prefWidth="150" text="Тип задачи">
+        <cellValueFactory>
+          <PropertyValueFactory property="type" />
         </cellValueFactory>
       </TableColumn>
       <TableColumn fx:id="statusColumn" prefWidth="120" text="Статус">

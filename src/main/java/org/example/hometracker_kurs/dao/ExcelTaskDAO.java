@@ -14,6 +14,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.logging.Level;
@@ -98,7 +99,6 @@ public class ExcelTaskDAO implements TaskDAO {
 
         switch (sortField != null ? sortField : "") {
             case "due_date":
-                // Сортировка по дате выполнения (учет null значений)
                 comparator = Comparator.comparing(
                         Task::getDueDate,
                         Comparator.nullsLast(Comparator.naturalOrder())
@@ -106,12 +106,10 @@ public class ExcelTaskDAO implements TaskDAO {
                 break;
 
             case "priority":
-                // Сортировка по приоритету
                 comparator = Comparator.comparingInt(Task::getPriority);
                 break;
 
             case "assigned_to":
-                // Сортировка по исполнителю (без учета регистра)
                 comparator = Comparator.comparing(
                         Task::getAssignedTo,
                         Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)
@@ -119,44 +117,32 @@ public class ExcelTaskDAO implements TaskDAO {
                 break;
 
             default:
-                // Сортировка по умолчанию: сначала по дате, затем по приоритету
                 comparator = Comparator.comparing(
                         Task::getDueDate,
                         Comparator.nullsLast(Comparator.naturalOrder())
                 ).thenComparingInt(Task::getPriority);
         }
 
-        // Применяем обратный порядок если нужно
         return ascending ? comparator : comparator.reversed();
     }
 
     private Task extractTaskFromRow(Row row) {
         try {
-            int id = (int) row.getCell(0).getNumericCellValue();
+            int id = getCellIntValue(row.getCell(0));
             String name = getCellStringValue(row.getCell(1));
             String description = getCellStringValue(row.getCell(2));
 
-            LocalDate dueDate = null;
-            Cell dueDateCell = row.getCell(3);
-            if (dueDateCell != null && dueDateCell.getCellType() == CellType.NUMERIC) {
-                dueDate = dueDateCell.getLocalDateTimeCellValue().toLocalDate();
-            }
-
-            int priority = (int) row.getCell(4).getNumericCellValue();
+            LocalDate dueDate = getCellDateValue(row.getCell(3));
+            int priority = getCellIntValue(row.getCell(4));
             String assignedTo = getCellStringValue(row.getCell(5));
             TaskStatus status = TaskStatus.valueOf(getCellStringValue(row.getCell(6)));
-
-            LocalDate lastCompleted = null;
-            Cell lastCompletedCell = row.getCell(7);
-            if (lastCompletedCell != null && lastCompletedCell.getCellType() == CellType.NUMERIC) {
-                lastCompleted = lastCompletedCell.getLocalDateTimeCellValue().toLocalDate();
-            }
-
-            int frequencyDays = (int) row.getCell(8).getNumericCellValue();
+            LocalDate lastCompleted = getCellDateValue(row.getCell(7));
+            String type = getCellStringValue(row.getCell(8)); // Чтение типа задачи
+            int frequencyDays = getCellIntValue(row.getCell(9));
 
             Task task = new Task(id, name, description, dueDate, priority,
                     assignedTo, status, lastCompleted, frequencyDays);
-            task.setType(assignedTo); // Используем assignedTo как тип для совместимости
+            task.setType(type); // Здесь правильно устанавливается тип
             return task;
         } catch (Exception e) {
             logger.log(Level.WARNING, "Error extracting task from row: " + e.getMessage(), e);
@@ -170,8 +156,40 @@ public class ExcelTaskDAO implements TaskDAO {
             return cell.getStringCellValue();
         } else if (cell.getCellType() == CellType.NUMERIC) {
             return String.valueOf((int) cell.getNumericCellValue());
+        } else if (cell.getCellType() == CellType.BOOLEAN) {
+            return String.valueOf(cell.getBooleanCellValue());
         }
         return "";
+    }
+
+    private int getCellIntValue(Cell cell) {
+        if (cell == null) return 0;
+        switch (cell.getCellType()) {
+            case NUMERIC:
+                return (int) cell.getNumericCellValue();
+            case STRING:
+                try {
+                    return Integer.parseInt(cell.getStringCellValue().trim());
+                } catch (NumberFormatException e) {
+                    return 0;
+                }
+            default:
+                return 0;
+        }
+    }
+
+    private LocalDate getCellDateValue(Cell cell) {
+        if (cell == null) return null;
+        if (cell.getCellType() == CellType.NUMERIC && DateUtil.isCellDateFormatted(cell)) {
+            return cell.getLocalDateTimeCellValue().toLocalDate();
+        } else if (cell.getCellType() == CellType.STRING) {
+            try {
+                return LocalDate.parse(cell.getStringCellValue().trim());
+            } catch (DateTimeParseException e) {
+                return null;
+            }
+        }
+        return null;
     }
 
     private void saveToFile() {
@@ -187,7 +205,7 @@ public class ExcelTaskDAO implements TaskDAO {
 
             Row headerRow = sheet.createRow(0);
             String[] headers = {"ID", "Name", "Description", "Due Date", "Priority",
-                    "Assigned To", "Status", "Last Completed", "Frequency Days"};
+                    "Assigned To", "Status", "Last Completed", "Type", "Frequency Days"};
 
             for (int i = 0; i < headers.length; i++) {
                 Cell cell = headerRow.createCell(i);
@@ -265,9 +283,6 @@ public class ExcelTaskDAO implements TaskDAO {
         if (task.getStatus() == null) {
             throw new SQLException("Task status cannot be null");
         }
-        if (task.getDueDate() != null && task.getDueDate().isBefore(LocalDate.now())) {
-            throw new SQLException("Due date cannot be in the past");
-        }
         if (task.getPriority() < 1 || task.getPriority() > 5) {
             throw new SQLException("Priority must be between 1 and 5");
         }
@@ -298,7 +313,6 @@ public class ExcelTaskDAO implements TaskDAO {
         saveToFile();
     }
 
-
     @Override
     public void updateTaskStatus(int id, TaskStatus status) throws SQLException {
         Task task = getTaskById(id);
@@ -315,7 +329,6 @@ public class ExcelTaskDAO implements TaskDAO {
     public void markTaskAsCompleted(int id) throws SQLException {
         updateTaskStatus(id, TaskStatus.COMPLETED);
     }
-
 
     @Override
     public void close() throws SQLException {

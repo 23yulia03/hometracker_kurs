@@ -16,7 +16,11 @@ public class H2TaskDAO implements TaskDAO {
     private final Connection connection;
 
     public H2TaskDAO(Config config) throws SQLException {
-        this.connection = DriverManager.getConnection(config.getH2Url());
+        this.connection = DriverManager.getConnection(
+                config.getH2Url(),
+                config.getH2User(),
+                config.getH2Password()
+        );
         createTable();
     }
 
@@ -65,12 +69,10 @@ public class H2TaskDAO implements TaskDAO {
         ObservableList<Task> result = FXCollections.observableArrayList();
         StringBuilder sql = new StringBuilder("SELECT * FROM tasks WHERE 1=1");
 
-        // Фильтрация по типу
         if (type != null && !type.isEmpty()) {
             sql.append(" AND assigned_to = ?");
         }
 
-        // Фильтрация по статусу
         if (status != null && !status.equals("Все")) {
             switch (status) {
                 case "Активные" -> sql.append(" AND status = 'ACTIVE'");
@@ -80,17 +82,14 @@ public class H2TaskDAO implements TaskDAO {
             }
         }
 
-        // Поиск по ключевым словам
         if (keyword != null && !keyword.isBlank()) {
             sql.append(" AND (LOWER(name) LIKE ? OR LOWER(description) LIKE ?)");
         }
 
-        // Сортировка
         if (sortField != null && !sortField.isEmpty()) {
             sql.append(" ORDER BY ").append(sortField);
             sql.append(ascending ? " ASC" : " DESC");
         } else {
-            // Сортировка по умолчанию
             sql.append(" ORDER BY due_date, priority DESC");
         }
 
@@ -118,7 +117,7 @@ public class H2TaskDAO implements TaskDAO {
     }
 
     private Task extractTaskFromResultSet(ResultSet rs) throws SQLException {
-        return new Task(
+        Task task = new Task(
                 rs.getInt("id"),
                 rs.getString("name"),
                 rs.getString("description"),
@@ -129,6 +128,26 @@ public class H2TaskDAO implements TaskDAO {
                 rs.getDate("last_completed") != null ? rs.getDate("last_completed").toLocalDate() : null,
                 rs.getInt("frequency_days")
         );
+
+        // Автоматическая установка статуса "OVERDUE" при необходимости
+        if (task.getDueDate() != null &&
+                task.getDueDate().isBefore(LocalDate.now()) &&
+                task.getStatus() == TaskStatus.ACTIVE) {
+
+            task.setStatus(TaskStatus.OVERDUE);
+            forceUpdateStatus(task.getId(), TaskStatus.OVERDUE);
+        }
+
+        return task;
+    }
+
+    private void forceUpdateStatus(int id, TaskStatus status) throws SQLException {
+        String sql = "UPDATE tasks SET status = ? WHERE id = ?";
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setString(1, status.name());
+            stmt.setInt(2, id);
+            stmt.executeUpdate();
+        }
     }
 
     @Override
@@ -197,9 +216,6 @@ public class H2TaskDAO implements TaskDAO {
         }
         if (task.getStatus() == null) {
             throw new SQLException("Статус задачи не может быть null");
-        }
-        if (task.getDueDate() != null && task.getDueDate().isBefore(LocalDate.now())) {
-            throw new SQLException("Дата выполнения не может быть в прошлом");
         }
         if (task.getPriority() < 1 || task.getPriority() > 5) {
             throw new SQLException("Приоритет должен быть между 1 и 5");

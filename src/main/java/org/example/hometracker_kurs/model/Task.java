@@ -72,6 +72,7 @@ public class Task {
         }
     }
 
+
     @Override
     public String toString() {
         return String.format("%s [%s, %s]", name, status.getDisplayName(),
