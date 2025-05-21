@@ -8,6 +8,7 @@ import javafx.scene.control.*;
 import javafx.scene.paint.Color;
 import org.example.hometracker_kurs.model.Task;
 import org.example.hometracker_kurs.model.TaskStatus;
+import org.example.hometracker_kurs.service.TaskManagerService;
 import org.example.hometracker_kurs.service.TaskService;
 
 import java.sql.SQLException;
@@ -19,8 +20,9 @@ import java.util.logging.Logger;
 public class MainController {
     private final Logger logger = Logger.getLogger(getClass().getName());
     private TaskService taskService;
+    private TaskManagerService taskManagerService;
 
-    // Элементы управления таблицей и фильтрами
+    // FXML элементы остаются теми же
     @FXML private TableView<Task> taskTable;
     @FXML private TableColumn<Task, TaskStatus> statusColumn;
     @FXML private ComboBox<String> taskTypeComboBox;
@@ -29,22 +31,16 @@ public class MainController {
     @FXML private ComboBox<String> sortFieldComboBox;
     @FXML private ComboBox<String> sortOrderComboBox;
     @FXML private ComboBox<String> dataSourceComboBox;
-
-    // Элементы формы редактирования
     @FXML private TextField nameField;
     @FXML private TextArea descriptionField;
     @FXML private DatePicker dueDatePicker;
     @FXML private ComboBox<Integer> priorityComboBox;
     @FXML private ComboBox<String> assigneeComboBox;
     @FXML private ComboBox<String> typeComboBox;
-
-    // Элементы статистики
     @FXML private Label totalTasksLabel;
     @FXML private Label activeTasksLabel;
     @FXML private Label completedTasksLabel;
     @FXML private Label overdueTasksLabel;
-
-    // Информация об источнике данных
     @FXML private Label dataSourceLabel;
 
     @FXML
@@ -52,54 +48,33 @@ public class MainController {
         initializeComboBoxes();
         setupTableColumns();
         setupStatusColumn();
-        initializeSortingControls();
     }
 
     private void initializeComboBoxes() {
-        // Инициализация ComboBox для приоритета
+        // Инициализация ComboBox (остается без изменений)
         priorityComboBox.setItems(FXCollections.observableArrayList(1, 2, 3, 4, 5));
         priorityComboBox.setValue(3);
-
-        // Инициализация ComboBox для исполнителей
-        assigneeComboBox.setItems(FXCollections.observableArrayList(
-                "Мама", "Папа", "Ребенок", "Другое"));
+        assigneeComboBox.setItems(FXCollections.observableArrayList("Мама", "Папа", "Ребенок", "Другое"));
         assigneeComboBox.setValue("Мама");
-
-        // Инициализация ComboBox для типов задач
         typeComboBox.setItems(FXCollections.observableArrayList(
                 "Уборка", "Покупки", "Приготовление еды", "Сад и огород",
                 "Ремонт и обслуживание", "Финансы", "Здоровье", "Хобби и личное", "Прочее"));
         typeComboBox.setValue("Уборка");
-
-        // Инициализация ComboBox для фильтрации по типу
         taskTypeComboBox.setItems(FXCollections.observableArrayList(
                 "Все", "Уборка", "Покупки", "Приготовление еды", "Сад и огород",
                 "Ремонт и обслуживание", "Финансы", "Здоровье", "Хобби и личное", "Прочее"));
         taskTypeComboBox.setValue("Все");
-
-        // Инициализация ComboBox для фильтрации по статусу
-        statusComboBox.setItems(FXCollections.observableArrayList(
-                "Все", "Активные", "Выполненные", "Просроченные"));
+        statusComboBox.setItems(FXCollections.observableArrayList("Все", "Активные", "Выполненные", "Просроченные"));
         statusComboBox.setValue("Все");
-    }
-
-    private void initializeSortingControls() {
-        // Инициализация ComboBox для выбора поля сортировки
         sortFieldComboBox.setItems(FXCollections.observableArrayList(
                 "Без сортировки", "По дате", "По приоритету", "По категории"));
         sortFieldComboBox.setValue("Без сортировки");
-
-        // Инициализация ComboBox для выбора направления сортировки
-        sortOrderComboBox.setItems(FXCollections.observableArrayList(
-                "По возрастанию", "По убыванию"));
+        sortOrderComboBox.setItems(FXCollections.observableArrayList("По возрастанию", "По убыванию"));
         sortOrderComboBox.setValue("По возрастанию");
     }
 
     private void setupTableColumns() {
-        // Настройка политики изменения размера столбцов
         taskTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
-
-        // Обработчик выбора задачи в таблице
         taskTable.getSelectionModel().selectedItemProperty().addListener(
                 (obs, oldSel, newSel) -> {
                     if (newSel != null) {
@@ -109,7 +84,6 @@ public class MainController {
     }
 
     private void setupStatusColumn() {
-        // Настройка отображения статуса с цветами
         statusColumn.setCellFactory(col -> new TableCell<>() {
             @Override
             protected void updateItem(TaskStatus status, boolean empty) {
@@ -134,10 +108,9 @@ public class MainController {
     @FXML
     private void refreshData() {
         try {
-            ObservableList<Task> tasks = taskService.getAllTasks();
+            ObservableList<Task> tasks = taskManagerService.refreshData();
             taskTable.setItems(tasks);
             updateStatistics();
-            updateOverdueTasks();
         } catch (SQLException e) {
             showAlert("Ошибка загрузки задач", e.getMessage());
             taskTable.setItems(FXCollections.observableArrayList());
@@ -149,7 +122,7 @@ public class MainController {
         if (!validateForm()) return;
         try {
             Task task = createTaskFromForm();
-            taskService.addTask(task);
+            taskManagerService.addTask(task);
             refreshData();
             clearForm();
         } catch (SQLException e) {
@@ -170,29 +143,23 @@ public class MainController {
         try {
             Task updated = createTaskFromForm();
             updated.setId(selected.getId());
-            taskService.updateTask(updated);
+            taskManagerService.updateTask(updated);
             refreshData();
         } catch (SQLException e) {
             showAlert("Ошибка обновления", e.getMessage());
         }
     }
 
-    private Task getSelectedTaskOrAlert(String action) {
-        Task selected = taskTable.getSelectionModel().getSelectedItem();
-        if (selected == null) {
-            showAlert("Ошибка", "Выберите задачу для " + action);
-            return null;
-        }
-        return selected;
-    }
-
     @FXML
     private void deleteTask() {
-        Task selected = getSelectedTaskOrAlert("удаления");
-        if (selected == null) return;
+        Task selected = taskTable.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            showAlert("Ошибка", "Выберите задачу для удаления");
+            return;
+        }
 
         try {
-            taskService.deleteTask(selected.getId());
+            taskManagerService.deleteTask(selected);
             refreshData();
         } catch (SQLException e) {
             showAlert("Ошибка удаления", e.getMessage());
@@ -201,11 +168,14 @@ public class MainController {
 
     @FXML
     private void completeTask() {
-        Task selected = getSelectedTaskOrAlert("выполнения");
-        if (selected == null) return;
+        Task selected = taskTable.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            showAlert("Ошибка", "Выберите задачу для выполнения");
+            return;
+        }
 
         try {
-            taskService.completeTask(selected.getId());
+            taskManagerService.completeTask(selected);
             refreshData();
             taskTable.refresh();
             updateStatistics();
@@ -236,7 +206,7 @@ public class MainController {
         result.ifPresent(days -> {
             try {
                 int daysToPostpone = Integer.parseInt(days);
-                taskService.postponeTask(selected.getId(), daysToPostpone);
+                taskManagerService.postponeTask(selected, daysToPostpone);
                 refreshData();
                 taskTable.refresh();
                 showAlert("Успех", "Задача успешно отложена на " + days + " дней");
@@ -259,7 +229,7 @@ public class MainController {
         }
 
         try {
-            taskService.reactivateTask(selected.getId());
+            taskManagerService.reactivateTask(selected);
             refreshData();
             taskTable.refresh();
             showAlert("Успех", "Задача снова активна");
@@ -270,8 +240,6 @@ public class MainController {
 
     @FXML
     private void applyFilters() {
-        if (taskService == null) return;
-
         try {
             String type = "Все".equals(taskTypeComboBox.getValue()) ? null : taskTypeComboBox.getValue();
             String status = "Все".equals(statusComboBox.getValue()) ? null : statusComboBox.getValue();
@@ -286,7 +254,7 @@ public class MainController {
 
             boolean ascending = "По возрастанию".equals(sortOrderComboBox.getValue());
 
-            ObservableList<Task> filtered = taskService.getFilteredTasks(
+            ObservableList<Task> filtered = taskManagerService.applyFilters(
                     type, status, keyword, sortField, ascending);
 
             taskTable.setItems(filtered);
@@ -303,10 +271,45 @@ public class MainController {
         searchField.clear();
         sortFieldComboBox.setValue("Без сортировки");
         sortOrderComboBox.setValue("По возрастанию");
-
         refreshData();
     }
 
+    @FXML
+    private void switchDataSource() {
+        String selectedSource = dataSourceComboBox.getValue();
+        if (selectedSource == null) {
+            showAlert("Ошибка", "Выберите источник данных");
+            return;
+        }
+
+        try {
+            String daoKey = switch (selectedSource) {
+                case "PostgreSQL" -> "postgres";
+                case "Excel" -> "excel";
+                case "H2 Database" -> "h2";
+                default -> throw new IllegalArgumentException("Неизвестный источник: " + selectedSource);
+            };
+
+            if (this.taskService != null) {
+                try {
+                    this.taskService.close();
+                } catch (SQLException e) {
+                    logger.log(Level.WARNING, "Ошибка при закрытии подключения", e);
+                }
+            }
+
+            this.taskService = new TaskService(daoKey);
+            this.taskManagerService = new TaskManagerService(taskService);
+            dataSourceLabel.setText("Выбранный источник данных: " + selectedSource);
+            refreshData();
+        } catch (Exception e) {
+            showAlert("Ошибка источника", e.getMessage());
+            taskTable.setItems(FXCollections.observableArrayList());
+            dataSourceLabel.setText("Ошибка подключения");
+        }
+    }
+
+    // Остальные вспомогательные методы остаются без изменений
     private boolean validateForm() {
         if (nameField.getText().isEmpty()) {
             showAlert("Ошибка", "Введите название задачи");
@@ -365,73 +368,12 @@ public class MainController {
         int completed = (int) tasks.stream().filter(t -> t.getStatus() == TaskStatus.COMPLETED).count();
         int overdue = (int) tasks.stream().filter(t -> t.getStatus() == TaskStatus.OVERDUE).count();
 
-        totalTasksLabel.setText(String.valueOf(total));
-        activeTasksLabel.setText(String.valueOf(active));
-        completedTasksLabel.setText(String.valueOf(completed));
-        overdueTasksLabel.setText(String.valueOf(overdue));
-    }
-
-    private void updateOverdueTasks() {
-        try {
-            ObservableList<Task> tasks = taskService.getAllTasks();
-            boolean updated = false;
-
-            for (Task task : tasks) {
-                if (task.getStatus() == TaskStatus.ACTIVE &&
-                        task.getDueDate() != null &&
-                        task.getDueDate().isBefore(LocalDate.now()) &&
-                        task.getStatus() != TaskStatus.OVERDUE) {
-
-                    task.setStatus(TaskStatus.OVERDUE);
-                    taskService.updateTask(task);
-                    updated = true;
-                }
-            }
-
-            if (updated) {
-                Platform.runLater(() -> {
-                    refreshData();
-                    showAlert("Информация", "Статусы задач были обновлены (найдены просроченные)");
-                });
-            }
-        } catch (SQLException e) {
-            Platform.runLater(() ->
-                    showAlert("Ошибка обновления статусов", e.getMessage()));
-        }
-    }
-
-    @FXML
-    private void switchDataSource() {
-        String selectedSource = dataSourceComboBox.getValue();
-        if (selectedSource == null) {
-            showAlert("Ошибка", "Выберите источник данных");
-            return;
-        }
-
-        try {
-            String daoKey = switch (selectedSource) {
-                case "PostgreSQL" -> "postgres";
-                case "Excel" -> "excel";
-                case "H2 Database" -> "h2";
-                default -> throw new IllegalArgumentException("Неизвестный источник: " + selectedSource);
-            };
-
-            if (this.taskService != null) {
-                try {
-                    this.taskService.close();
-                } catch (SQLException e) {
-                    logger.log(Level.WARNING, "Ошибка при закрытии подключения", e);
-                }
-            }
-
-            this.taskService = new TaskService(daoKey);
-            dataSourceLabel.setText("Выбранный источник данных: " + selectedSource);
-            refreshData();
-        } catch (Exception e) {
-            showAlert("Ошибка источника", e.getMessage());
-            taskTable.setItems(FXCollections.observableArrayList());
-            dataSourceLabel.setText("Ошибка подключения");
-        }
+        Platform.runLater(() -> {
+            totalTasksLabel.setText(String.valueOf(total));
+            activeTasksLabel.setText(String.valueOf(active));
+            completedTasksLabel.setText(String.valueOf(completed));
+            overdueTasksLabel.setText(String.valueOf(overdue));
+        });
     }
 
     private void showAlert(String title, String message) {
