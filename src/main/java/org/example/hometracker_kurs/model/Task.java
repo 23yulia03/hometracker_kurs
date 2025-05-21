@@ -12,11 +12,10 @@ public class Task {
     private TaskStatus status;
     private String type;
     private LocalDate lastCompleted;
-    private int frequencyDays;
 
     public Task(int id, String name, String description, LocalDate dueDate,
                 int priority, String assignedTo, TaskStatus status,
-                LocalDate lastCompleted, int frequencyDays) {
+                LocalDate lastCompleted) {
         this.id = id;
         this.name = name;
         this.description = description;
@@ -25,7 +24,6 @@ public class Task {
         this.assignedTo = assignedTo;
         this.status = status;
         this.lastCompleted = lastCompleted;
-        this.frequencyDays = frequencyDays;
     }
 
     // Геттеры и сеттеры
@@ -46,8 +44,6 @@ public class Task {
     public void setType(String type) { this.type = type; }
     public LocalDate getLastCompleted() { return lastCompleted; }
     public void setLastCompleted(LocalDate lastCompleted) { this.lastCompleted = lastCompleted; }
-    public int getFrequencyDays() { return frequencyDays; }
-    public void setFrequencyDays(int frequencyDays) { this.frequencyDays = frequencyDays; }
 
     public void setStatus(TaskStatus newStatus) {
         if (this.status == newStatus) {
@@ -71,7 +67,6 @@ public class Task {
             setStatus(TaskStatus.POSTPONED);
         }
     }
-
 
     @Override
     public String toString() {

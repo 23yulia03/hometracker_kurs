@@ -67,12 +67,14 @@ public class MainController {
 
         // Инициализация ComboBox для типов задач
         typeComboBox.setItems(FXCollections.observableArrayList(
-                "Уборка", "Покупки", "Приготовление еды", "Сад и огород", "Ремонт и обслуживание", "Финансы", "Здоровье", "Хобби и личное", "Прочее"));
+                "Уборка", "Покупки", "Приготовление еды", "Сад и огород",
+                "Ремонт и обслуживание", "Финансы", "Здоровье", "Хобби и личное", "Прочее"));
         typeComboBox.setValue("Уборка");
 
         // Инициализация ComboBox для фильтрации по типу
         taskTypeComboBox.setItems(FXCollections.observableArrayList(
-                "Уборка", "Покупки", "Приготовление еды", "Сад и огород", "Ремонт и обслуживание", "Финансы", "Здоровье", "Хобби и личное", "Прочее"));
+                "Все", "Уборка", "Покупки", "Приготовление еды", "Сад и огород",
+                "Ремонт и обслуживание", "Финансы", "Здоровье", "Хобби и личное", "Прочее"));
         taskTypeComboBox.setValue("Все");
 
         // Инициализация ComboBox для фильтрации по статусу
@@ -129,32 +131,13 @@ public class MainController {
         });
     }
 
-    private void setDataSource(String type) {
-        try {
-            String daoKey = switch (type) {
-                case "PostgreSQL" -> "postgres";
-                case "Excel" -> "excel";
-                case "H2 Database" -> "h2";
-                default -> throw new IllegalArgumentException("Неизвестный источник: " + type);
-            };
-
-            this.taskService = new TaskService(daoKey);
-            dataSourceLabel.setText("Выбранный источник данных: " + type);
-            refreshData();
-        } catch (Exception e) {
-            showAlert("Ошибка источника", e.getMessage());
-            taskTable.setItems(FXCollections.observableArrayList());
-            dataSourceLabel.setText("Ошибка подключения");
-        }
-    }
-
     @FXML
     private void refreshData() {
         try {
             ObservableList<Task> tasks = taskService.getAllTasks();
             taskTable.setItems(tasks);
             updateStatistics();
-            updateOverdueTasks();  // безопасно вызывать здесь
+            updateOverdueTasks();
         } catch (SQLException e) {
             showAlert("Ошибка загрузки задач", e.getMessage());
             taskTable.setItems(FXCollections.observableArrayList());
@@ -225,6 +208,7 @@ public class MainController {
             taskService.completeTask(selected.getId());
             refreshData();
             taskTable.refresh();
+            updateStatistics();
         } catch (SQLException e) {
             showAlert("Ошибка выполнения", e.getMessage());
         }
@@ -238,7 +222,6 @@ public class MainController {
             return;
         }
 
-        // Проверяем, не является ли задача уже отложенной
         if (selected.getStatus() == TaskStatus.POSTPONED) {
             showAlert("Информация", "Задача уже отложена");
             return;
@@ -290,12 +273,10 @@ public class MainController {
         if (taskService == null) return;
 
         try {
-            // Получаем параметры фильтрации
             String type = "Все".equals(taskTypeComboBox.getValue()) ? null : taskTypeComboBox.getValue();
             String status = "Все".equals(statusComboBox.getValue()) ? null : statusComboBox.getValue();
             String keyword = searchField.getText().isBlank() ? null : searchField.getText();
 
-            // Преобразуем параметры сортировки в поля базы данных
             String sortField = switch (sortFieldComboBox.getValue()) {
                 case "По дате" -> "due_date";
                 case "По приоритету" -> "priority";
@@ -305,11 +286,9 @@ public class MainController {
 
             boolean ascending = "По возрастанию".equals(sortOrderComboBox.getValue());
 
-            // Получаем отфильтрованные и отсортированные задачи
             ObservableList<Task> filtered = taskService.getFilteredTasks(
                     type, status, keyword, sortField, ascending);
 
-            // Обновляем таблицу
             taskTable.setItems(filtered);
             updateStatistics();
         } catch (SQLException e) {
@@ -319,14 +298,12 @@ public class MainController {
 
     @FXML
     private void resetFilters() {
-        // Сбрасываем все фильтры
         taskTypeComboBox.setValue("Все");
         statusComboBox.setValue("Все");
         searchField.clear();
         sortFieldComboBox.setValue("Без сортировки");
         sortOrderComboBox.setValue("По возрастанию");
 
-        // Обновляем данные
         refreshData();
     }
 
@@ -355,8 +332,7 @@ public class MainController {
                 priorityComboBox.getValue(),
                 assigneeComboBox.getValue(),
                 TaskStatus.ACTIVE,
-                null,
-                0
+                null
         );
         task.setType(typeComboBox.getValue());
         return task;
@@ -394,7 +370,6 @@ public class MainController {
         completedTasksLabel.setText(String.valueOf(completed));
         overdueTasksLabel.setText(String.valueOf(overdue));
     }
-
 
     private void updateOverdueTasks() {
         try {
@@ -441,7 +416,6 @@ public class MainController {
                 default -> throw new IllegalArgumentException("Неизвестный источник: " + selectedSource);
             };
 
-            // Закрываем предыдущее подключение, если оно есть
             if (this.taskService != null) {
                 try {
                     this.taskService.close();
@@ -450,7 +424,6 @@ public class MainController {
                 }
             }
 
-            // Создаем новый сервис с выбранным DAO
             this.taskService = new TaskService(daoKey);
             dataSourceLabel.setText("Выбранный источник данных: " + selectedSource);
             refreshData();

@@ -20,7 +20,7 @@ public class PostgresTaskDAO implements TaskDAO {
         this.config = config;
         initialize();
         try {
-            updateOverdueTasks(); // Обновляем статусы при инициализации
+            updateOverdueTasks();
         } catch (SQLException e) {
             logger.log(Level.SEVERE, "Error updating overdue tasks on startup", e);
         }
@@ -58,15 +58,12 @@ public class PostgresTaskDAO implements TaskDAO {
                 assigned_to VARCHAR(50),
                 status VARCHAR(20) NOT NULL CHECK (status IN ('ACTIVE', 'COMPLETED', 'POSTPONED', 'CANCELLED', 'OVERDUE')),
                 last_completed DATE,
-                frequency_days INTEGER,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                task_type VARCHAR(50)
+                type VARCHAR(50)
             );
             CREATE INDEX IF NOT EXISTS idx_tasks_assigned_to ON tasks(assigned_to);
             CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date);
             CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
-            CREATE INDEX IF NOT EXISTS idx_tasks_type ON tasks(task_type);
+            CREATE INDEX IF NOT EXISTS idx_tasks_type ON tasks(type);
             """;
 
         try (Statement stmt = connection.createStatement()) {
@@ -97,10 +94,9 @@ public class PostgresTaskDAO implements TaskDAO {
                 rs.getInt("priority"),
                 rs.getString("assigned_to"),
                 TaskStatus.valueOf(rs.getString("status")),
-                rs.getDate("last_completed") != null ? rs.getDate("last_completed").toLocalDate() : null,
-                rs.getInt("frequency_days")
+                rs.getDate("last_completed") != null ? rs.getDate("last_completed").toLocalDate() : null
         );
-        task.setType(rs.getString("task_type"));
+        task.setType(rs.getString("type"));
         return task;
     }
 
@@ -115,12 +111,10 @@ public class PostgresTaskDAO implements TaskDAO {
         ObservableList<Task> result = FXCollections.observableArrayList();
         StringBuilder sql = new StringBuilder("SELECT * FROM tasks WHERE 1=1");
 
-        // Фильтрация по типу
         if (type != null && !type.isEmpty() && !type.equals("Все")) {
-            sql.append(" AND task_type = ?");
+            sql.append(" AND type = ?");
         }
 
-        // Фильтрация по статусу
         if (status != null && !status.equals("Все")) {
             switch (status) {
                 case "Активные" -> sql.append(" AND status = 'ACTIVE'");
@@ -129,18 +123,21 @@ public class PostgresTaskDAO implements TaskDAO {
             }
         }
 
-        // Поиск по ключевым словам
         if (keyword != null && !keyword.isBlank()) {
             sql.append(" AND (LOWER(name) LIKE ? OR LOWER(description) LIKE ?)");
         }
 
-        // Сортировка
+        // Измененная логика сортировки
         if (sortField != null && !sortField.isEmpty()) {
-            sql.append(" ORDER BY ").append(sortField);
-            sql.append(ascending ? " ASC" : " DESC");
+            sql.append(" ORDER BY ")
+                    .append(sortField)
+                    .append(ascending ? " ASC" : " DESC")
+                    .append(", id ASC"); // Добавляем сортировку по ID для сохранения порядка
         } else {
-            // Сортировка по умолчанию
-            sql.append(" ORDER BY due_date, priority DESC");
+            // Стандартная сортировка: сначала по статусу (чтобы выполненные были внизу),
+            // затем по дате и приоритету, и по ID для стабильности
+            sql.append(" ORDER BY CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END, ")
+                    .append("due_date, priority DESC, id ASC");
         }
 
         try (PreparedStatement stmt = connection.prepareStatement(sql.toString())) {
@@ -182,7 +179,6 @@ public class PostgresTaskDAO implements TaskDAO {
 
     @Override
     public void addTask(Task task) throws SQLException {
-        // Автоматически устанавливаем статус OVERDUE если дата в прошлом
         if (task.getDueDate() != null && task.getDueDate().isBefore(LocalDate.now())) {
             task.setStatus(TaskStatus.OVERDUE);
         }
@@ -192,8 +188,8 @@ public class PostgresTaskDAO implements TaskDAO {
         String sql = """
             INSERT INTO tasks 
             (name, description, due_date, priority, assigned_to, status, 
-             last_completed, frequency_days, task_type)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+             last_completed, type)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             RETURNING id
             """;
 
@@ -205,8 +201,7 @@ public class PostgresTaskDAO implements TaskDAO {
             stmt.setString(5, task.getAssignedTo());
             stmt.setString(6, task.getStatus().name());
             stmt.setDate(7, task.getLastCompleted() != null ? Date.valueOf(task.getLastCompleted()) : null);
-            stmt.setInt(8, task.getFrequencyDays());
-            stmt.setString(9, task.getType());
+            stmt.setString(8, task.getType());
 
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
@@ -232,11 +227,13 @@ public class PostgresTaskDAO implements TaskDAO {
         if (task.getPriority() < 1 || task.getPriority() > 5) {
             throw new SQLException("Priority must be between 1 and 5");
         }
+        if (task.getType() == null || task.getType().trim().isEmpty()) {
+            throw new SQLException("Task type cannot be empty");
+        }
     }
 
     @Override
     public void updateTask(Task task) throws SQLException {
-        // Проверяем, нужно ли обновить статус на OVERDUE
         if (task.getDueDate() != null &&
                 task.getDueDate().isBefore(LocalDate.now()) &&
                 task.getStatus() != TaskStatus.COMPLETED) {
@@ -249,8 +246,7 @@ public class PostgresTaskDAO implements TaskDAO {
         String sql = """
             UPDATE tasks SET 
             name = ?, description = ?, due_date = ?, priority = ?, 
-            assigned_to = ?, status = ?, last_completed = ?, frequency_days = ?,
-            task_type = ?, updated_at = CURRENT_TIMESTAMP
+            assigned_to = ?, status = ?, last_completed = ?, type = ?
             WHERE id = ?
             """;
 
@@ -262,9 +258,8 @@ public class PostgresTaskDAO implements TaskDAO {
             stmt.setString(5, task.getAssignedTo());
             stmt.setString(6, task.getStatus().name());
             stmt.setDate(7, task.getLastCompleted() != null ? Date.valueOf(task.getLastCompleted()) : null);
-            stmt.setInt(8, task.getFrequencyDays());
-            stmt.setString(9, task.getType());
-            stmt.setInt(10, task.getId());
+            stmt.setString(8, task.getType());
+            stmt.setInt(9, task.getId());
 
             int affectedRows = stmt.executeUpdate();
             if (affectedRows == 0) {
@@ -306,8 +301,7 @@ public class PostgresTaskDAO implements TaskDAO {
         String sql = """
             UPDATE tasks SET 
             status = ?, 
-            last_completed = ?,
-            updated_at = CURRENT_TIMESTAMP
+            last_completed = ?
             WHERE id = ?
             """;
 
@@ -334,8 +328,7 @@ public class PostgresTaskDAO implements TaskDAO {
     public void updateOverdueTasks() throws SQLException {
         String sql = """
             UPDATE tasks 
-            SET status = 'OVERDUE', 
-                updated_at = CURRENT_TIMESTAMP
+            SET status = 'OVERDUE'
             WHERE status IN ('ACTIVE', 'POSTPONED')
               AND due_date IS NOT NULL 
               AND due_date < CURRENT_DATE

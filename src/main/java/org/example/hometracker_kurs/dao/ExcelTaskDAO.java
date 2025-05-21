@@ -137,12 +137,11 @@ public class ExcelTaskDAO implements TaskDAO {
             String assignedTo = getCellStringValue(row.getCell(5));
             TaskStatus status = TaskStatus.valueOf(getCellStringValue(row.getCell(6)));
             LocalDate lastCompleted = getCellDateValue(row.getCell(7));
-            String type = getCellStringValue(row.getCell(8)); // Чтение типа задачи
-            int frequencyDays = getCellIntValue(row.getCell(9));
+            String type = getCellStringValue(row.getCell(8));
 
             Task task = new Task(id, name, description, dueDate, priority,
-                    assignedTo, status, lastCompleted, frequencyDays);
-            task.setType(type); // Здесь правильно устанавливается тип
+                    assignedTo, status, lastCompleted);
+            task.setType(type);
             return task;
         } catch (Exception e) {
             logger.log(Level.WARNING, "Error extracting task from row: " + e.getMessage(), e);
@@ -205,7 +204,7 @@ public class ExcelTaskDAO implements TaskDAO {
 
             Row headerRow = sheet.createRow(0);
             String[] headers = {"ID", "Name", "Description", "Due Date", "Priority",
-                    "Assigned To", "Status", "Last Completed", "Type", "Frequency Days"};
+                    "Assigned To", "Status", "Last Completed", "Type"};
 
             for (int i = 0; i < headers.length; i++) {
                 Cell cell = headerRow.createCell(i);
@@ -233,7 +232,7 @@ public class ExcelTaskDAO implements TaskDAO {
                     row.createCell(7).setCellValue(task.getLastCompleted().toString());
                 }
 
-                row.createCell(8).setCellValue(task.getFrequencyDays());
+                row.createCell(8).setCellValue(task.getType());
             }
 
             for (int i = 0; i < headers.length; i++) {
@@ -249,7 +248,7 @@ public class ExcelTaskDAO implements TaskDAO {
 
     @Override
     public ObservableList<Task> getAllTasks() throws SQLException {
-        return FXCollections.unmodifiableObservableList(tasks);
+        return FXCollections.observableArrayList(tasks);
     }
 
     @Override
@@ -286,6 +285,9 @@ public class ExcelTaskDAO implements TaskDAO {
         if (task.getPriority() < 1 || task.getPriority() > 5) {
             throw new SQLException("Priority must be between 1 and 5");
         }
+        if (task.getType() == null || task.getType().trim().isEmpty()) {
+            throw new SQLException("Task type cannot be empty");
+        }
     }
 
     @Override
@@ -300,7 +302,7 @@ public class ExcelTaskDAO implements TaskDAO {
         existing.setAssignedTo(task.getAssignedTo());
         existing.setStatus(task.getStatus());
         existing.setLastCompleted(task.getLastCompleted());
-        existing.setFrequencyDays(task.getFrequencyDays());
+        existing.setType(task.getType());
 
         saveToFile();
     }
@@ -323,6 +325,12 @@ public class ExcelTaskDAO implements TaskDAO {
         }
 
         saveToFile();
+
+        // Явно обновляем данные в списке
+        int index = tasks.indexOf(task);
+        if (index >= 0) {
+            tasks.set(index, task);
+        }
     }
 
     @Override

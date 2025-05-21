@@ -22,12 +22,13 @@ public class H2TaskDAO implements TaskDAO {
                 config.getH2Password()
         );
         createTable();
+        migrateDatabase();
     }
 
     private void createTable() throws SQLException {
         String sql = """
             CREATE TABLE IF NOT EXISTS tasks (
-                id SERIAL PRIMARY KEY,
+                id INTEGER AUTO_INCREMENT PRIMARY KEY,
                 name VARCHAR(100) NOT NULL,
                 description TEXT,
                 due_date DATE,
@@ -35,12 +36,25 @@ public class H2TaskDAO implements TaskDAO {
                 assigned_to VARCHAR(50),
                 status VARCHAR(20) NOT NULL CHECK (status IN ('ACTIVE', 'COMPLETED', 'POSTPONED', 'CANCELLED', 'OVERDUE')),
                 last_completed DATE,
-                frequency_days INTEGER
+                type VARCHAR(50)
             )
             """;
-
         try (Statement stmt = connection.createStatement()) {
             stmt.execute(sql);
+        }
+    }
+
+    private void migrateDatabase() throws SQLException {
+        try (Statement stmt = connection.createStatement()) {
+            // Удаляем ненужные столбцы, если они существуют
+            stmt.execute("ALTER TABLE tasks DROP COLUMN IF EXISTS frequency_days");
+            stmt.execute("ALTER TABLE tasks DROP COLUMN IF EXISTS created_at");
+            stmt.execute("ALTER TABLE tasks DROP COLUMN IF EXISTS updated_at");
+
+            // Добавляем столбец type, если его нет
+            stmt.execute("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS type VARCHAR(50)");
+            // Устанавливаем значение по умолчанию
+            stmt.execute("UPDATE tasks SET type = 'Домашние дела' WHERE type IS NULL");
         }
     }
 
@@ -69,8 +83,8 @@ public class H2TaskDAO implements TaskDAO {
         ObservableList<Task> result = FXCollections.observableArrayList();
         StringBuilder sql = new StringBuilder("SELECT * FROM tasks WHERE 1=1");
 
-        if (type != null && !type.isEmpty()) {
-            sql.append(" AND assigned_to = ?");
+        if (type != null && !type.isEmpty() && !type.equals("Все")) {
+            sql.append(" AND type = ?");
         }
 
         if (status != null && !status.equals("Все")) {
@@ -96,7 +110,7 @@ public class H2TaskDAO implements TaskDAO {
         try (PreparedStatement stmt = connection.prepareStatement(sql.toString())) {
             int index = 1;
 
-            if (type != null && !type.isEmpty()) {
+            if (type != null && !type.isEmpty() && !type.equals("Все")) {
                 stmt.setString(index++, type);
             }
 
@@ -125,9 +139,9 @@ public class H2TaskDAO implements TaskDAO {
                 rs.getInt("priority"),
                 rs.getString("assigned_to"),
                 TaskStatus.valueOf(rs.getString("status")),
-                rs.getDate("last_completed") != null ? rs.getDate("last_completed").toLocalDate() : null,
-                rs.getInt("frequency_days")
+                rs.getDate("last_completed") != null ? rs.getDate("last_completed").toLocalDate() : null
         );
+        task.setType(rs.getString("type"));
 
         // Автоматическая установка статуса "OVERDUE" при необходимости
         if (task.getDueDate() != null &&
@@ -167,21 +181,25 @@ public class H2TaskDAO implements TaskDAO {
     @Override
     public void addTask(Task task) throws SQLException {
         validateTask(task);
-        String sql = "INSERT INTO tasks VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-            stmt.setInt(1, task.getId());
-            stmt.setString(2, task.getName());
-            stmt.setString(3, task.getDescription());
-            stmt.setDate(4, task.getDueDate() != null ? Date.valueOf(task.getDueDate()) : null);
-            stmt.setInt(5, task.getPriority());
-            stmt.setString(6, task.getAssignedTo());
-            stmt.setString(7, task.getStatus().name());
-            stmt.setDate(8, task.getLastCompleted() != null ? Date.valueOf(task.getLastCompleted()) : null);
-            stmt.setInt(9, task.getFrequencyDays());
+        String sql = "INSERT INTO tasks (name, description, due_date, priority, assigned_to, status, last_completed, type) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+
+        try (PreparedStatement stmt = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            stmt.setString(1, task.getName());
+            stmt.setString(2, task.getDescription());
+            stmt.setDate(3, task.getDueDate() != null ? Date.valueOf(task.getDueDate()) : null);
+            stmt.setInt(4, task.getPriority());
+            stmt.setString(5, task.getAssignedTo());
+            stmt.setString(6, task.getStatus().name());
+            stmt.setDate(7, task.getLastCompleted() != null ? Date.valueOf(task.getLastCompleted()) : null);
+            stmt.setString(8, task.getType());
             stmt.executeUpdate();
-        } catch (SQLException e) {
-            logger.log(Level.SEVERE, "Error adding task", e);
-            throw e;
+
+            try (ResultSet rs = stmt.getGeneratedKeys()) {
+                if (rs.next()) {
+                    task.setId(rs.getInt(1));
+                }
+            }
         }
     }
 
@@ -189,7 +207,9 @@ public class H2TaskDAO implements TaskDAO {
     public void updateTask(Task task) throws SQLException {
         validateTask(task);
         String sql = "UPDATE tasks SET name = ?, description = ?, due_date = ?, priority = ?, " +
-                "assigned_to = ?, status = ?, last_completed = ?, frequency_days = ? WHERE id = ?";
+                "assigned_to = ?, status = ?, last_completed = ?, type = ? " +
+                "WHERE id = ?";
+
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
             stmt.setString(1, task.getName());
             stmt.setString(2, task.getDescription());
@@ -198,12 +218,9 @@ public class H2TaskDAO implements TaskDAO {
             stmt.setString(5, task.getAssignedTo());
             stmt.setString(6, task.getStatus().name());
             stmt.setDate(7, task.getLastCompleted() != null ? Date.valueOf(task.getLastCompleted()) : null);
-            stmt.setInt(8, task.getFrequencyDays());
+            stmt.setString(8, task.getType());
             stmt.setInt(9, task.getId());
             stmt.executeUpdate();
-        } catch (SQLException e) {
-            logger.log(Level.SEVERE, "Error updating task", e);
-            throw e;
         }
     }
 
@@ -220,6 +237,9 @@ public class H2TaskDAO implements TaskDAO {
         if (task.getPriority() < 1 || task.getPriority() > 5) {
             throw new SQLException("Приоритет должен быть между 1 и 5");
         }
+        if (task.getType() == null || task.getType().trim().isEmpty()) {
+            throw new SQLException("Тип задачи не может быть пустым");
+        }
     }
 
     @Override
@@ -231,9 +251,6 @@ public class H2TaskDAO implements TaskDAO {
             if (affectedRows == 0) {
                 throw new SQLException("Task not found with id: " + id);
             }
-        } catch (SQLException e) {
-            logger.log(Level.SEVERE, "Error deleting task", e);
-            throw e;
         }
     }
 
