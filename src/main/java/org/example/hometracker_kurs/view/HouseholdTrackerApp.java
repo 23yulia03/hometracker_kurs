@@ -23,7 +23,7 @@ public class HouseholdTrackerApp extends Application {
 
             Parent root = loader.load();
             stage.setScene(new Scene(root));
-            stage.setTitle("Домашний трекер задач");
+            stage.setTitle("Трекер домашних дел");
             stage.setWidth(1450);
             stage.setHeight(820);
             stage.show();

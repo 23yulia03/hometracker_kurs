@@ -81,10 +81,10 @@ public class TaskManagerService {
             }
 
             if (updated) {
-                System.out.println("Updated overdue tasks");
+                System.out.println("Обновленны просроченные задачи");
             }
         } catch (SQLException e) {
-            System.err.println("Error updating overdue tasks: " + e.getMessage());
+            System.err.println("Ошибка при обновлении просроченных задач: " + e.getMessage());
         }
     }
 }

@@ -6,6 +6,9 @@ import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.paint.Color;
+import org.example.hometracker_kurs.controller.utils.FilterManager;
+import org.example.hometracker_kurs.controller.utils.FormHandler;
+import org.example.hometracker_kurs.controller.utils.StatisticsCalculator;
 import org.example.hometracker_kurs.model.Task;
 import org.example.hometracker_kurs.model.TaskStatus;
 import org.example.hometracker_kurs.service.TaskManagerService;
@@ -21,8 +24,10 @@ public class MainController {
     private final Logger logger = Logger.getLogger(getClass().getName());
     private TaskService taskService;
     private TaskManagerService taskManagerService;
+    private FormHandler formHandler;
+    private FilterManager filterManager;
+    private StatisticsCalculator statisticsCalculator;
 
-    // FXML элементы остаются теми же
     @FXML private TableView<Task> taskTable;
     @FXML private TableColumn<Task, TaskStatus> statusColumn;
     @FXML private ComboBox<String> taskTypeComboBox;
@@ -48,6 +53,14 @@ public class MainController {
         initializeComboBoxes();
         setupTableColumns();
         setupStatusColumn();
+
+        // Инициализация вспомогательных классов
+        formHandler = new FormHandler(nameField, descriptionField, dueDatePicker,
+                priorityComboBox, assigneeComboBox, typeComboBox);
+        filterManager = new FilterManager(taskTypeComboBox, statusComboBox, searchField,
+                sortFieldComboBox, sortOrderComboBox, taskManagerService);
+        statisticsCalculator = new StatisticsCalculator(totalTasksLabel, activeTasksLabel,
+                completedTasksLabel, overdueTasksLabel);
     }
 
     private void initializeComboBoxes() {
@@ -119,12 +132,14 @@ public class MainController {
 
     @FXML
     private void addTask() {
-        if (!validateForm()) return;
+        if (!formHandler.validateForm()) {
+            showAlert("Ошибка", "Заполните все обязательные поля");
+            return;
+        }
         try {
-            Task task = createTaskFromForm();
-            taskManagerService.addTask(task);
+            taskManagerService.addTask(formHandler.createTaskFromForm());
             refreshData();
-            clearForm();
+            formHandler.clearForm();
         } catch (SQLException e) {
             showAlert("Ошибка добавления", e.getMessage());
         }
@@ -241,24 +256,8 @@ public class MainController {
     @FXML
     private void applyFilters() {
         try {
-            String type = "Все".equals(taskTypeComboBox.getValue()) ? null : taskTypeComboBox.getValue();
-            String status = "Все".equals(statusComboBox.getValue()) ? null : statusComboBox.getValue();
-            String keyword = searchField.getText().isBlank() ? null : searchField.getText();
-
-            String sortField = switch (sortFieldComboBox.getValue()) {
-                case "По дате" -> "due_date";
-                case "По приоритету" -> "priority";
-                case "По категории" -> "assigned_to";
-                default -> null;
-            };
-
-            boolean ascending = "По возрастанию".equals(sortOrderComboBox.getValue());
-
-            ObservableList<Task> filtered = taskManagerService.applyFilters(
-                    type, status, keyword, sortField, ascending);
-
-            taskTable.setItems(filtered);
-            updateStatistics();
+            taskTable.setItems(filterManager.applyFilters());
+            statisticsCalculator.updateStatistics(taskTable.getItems());
         } catch (SQLException e) {
             showAlert("Ошибка фильтрации", e.getMessage());
         }
@@ -266,11 +265,7 @@ public class MainController {
 
     @FXML
     private void resetFilters() {
-        taskTypeComboBox.setValue("Все");
-        statusComboBox.setValue("Все");
-        searchField.clear();
-        sortFieldComboBox.setValue("Без сортировки");
-        sortOrderComboBox.setValue("По возрастанию");
+        filterManager.resetFilters();
         refreshData();
     }
 
