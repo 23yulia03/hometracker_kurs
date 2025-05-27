@@ -7,6 +7,7 @@ import org.example.hometracker_kurs.model.Task;
 import org.example.hometracker_kurs.service.TaskManagerService;
 
 import java.sql.SQLException;
+import java.util.Map;
 
 public class FilterManager {
     private final ComboBox<String> taskTypeComboBox;
@@ -15,6 +16,12 @@ public class FilterManager {
     private final ComboBox<String> sortFieldComboBox;
     private final ComboBox<String> sortOrderComboBox;
     private final TaskManagerService taskManagerService;
+
+    private static final Map<String, String> SORT_MAP = Map.of(
+            "По дате", "due_date",
+            "По приоритету", "priority",
+            "По категории", "assigned_to"
+    );
 
     public FilterManager(ComboBox<String> taskTypeComboBox, ComboBox<String> statusComboBox,
                          TextField searchField, ComboBox<String> sortFieldComboBox,
@@ -32,13 +39,7 @@ public class FilterManager {
         String status = "Все".equals(statusComboBox.getValue()) ? null : statusComboBox.getValue();
         String keyword = searchField.getText().isBlank() ? null : searchField.getText();
 
-        String sortField = switch (sortFieldComboBox.getValue()) {
-            case "По дате" -> "due_date";
-            case "По приоритету" -> "priority";
-            case "По категории" -> "assigned_to";
-            default -> null;
-        };
-
+        String sortField = SORT_MAP.getOrDefault(sortFieldComboBox.getValue(), null);
         boolean ascending = "По возрастанию".equals(sortOrderComboBox.getValue());
 
         return taskManagerService.applyFilters(type, status, keyword, sortField, ascending);

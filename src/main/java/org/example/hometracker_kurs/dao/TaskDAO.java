@@ -24,5 +24,7 @@ public interface TaskDAO {
     void updateTaskStatus(int id, TaskStatus status) throws SQLException;
     void markTaskAsCompleted(int id) throws SQLException;
 
+    void postponeTask(Task task, int days) throws SQLException;
+
     void close() throws SQLException;
 }

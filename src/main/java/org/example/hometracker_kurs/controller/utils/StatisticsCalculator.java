@@ -20,16 +20,21 @@ public class StatisticsCalculator {
     }
 
     public void updateStatistics(ObservableList<Task> tasks) {
-        if (tasks == null) return;
-
-        int total = tasks.size();
-        int active = (int) tasks.stream().filter(t -> t.getStatus() == TaskStatus.ACTIVE).count();
-        int completed = (int) tasks.stream().filter(t -> t.getStatus() == TaskStatus.COMPLETED).count();
-        int overdue = (int) tasks.stream().filter(t -> t.getStatus() == TaskStatus.OVERDUE).count();
+        int total = tasks == null ? 0 : tasks.size();
+        int active = countByStatus(tasks, TaskStatus.ACTIVE);
+        int completed = countByStatus(tasks, TaskStatus.COMPLETED);
+        int overdue = countByStatus(tasks, TaskStatus.OVERDUE);
 
         totalTasksLabel.setText(String.valueOf(total));
         activeTasksLabel.setText(String.valueOf(active));
         completedTasksLabel.setText(String.valueOf(completed));
         overdueTasksLabel.setText(String.valueOf(overdue));
+    }
+
+    private int countByStatus(ObservableList<Task> tasks, TaskStatus status) {
+        if (tasks == null) return 0;
+        return (int) tasks.stream()
+                .filter(t -> t.getStatus() == status)
+                .count();
     }
 }

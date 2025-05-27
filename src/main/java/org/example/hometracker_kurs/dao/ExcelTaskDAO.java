@@ -248,7 +248,7 @@ public class ExcelTaskDAO implements TaskDAO {
 
     @Override
     public ObservableList<Task> getAllTasks() throws SQLException {
-        return FXCollections.observableArrayList(tasks);
+        return tasks;
     }
 
     @Override
@@ -304,6 +304,11 @@ public class ExcelTaskDAO implements TaskDAO {
         existing.setLastCompleted(task.getLastCompleted());
         existing.setType(task.getType());
 
+        int index = tasks.indexOf(task);
+        if (index >= 0) {
+            tasks.set(index, task); // это заставит UI обновить строку
+        }
+
         saveToFile();
     }
 
@@ -336,6 +341,24 @@ public class ExcelTaskDAO implements TaskDAO {
     @Override
     public void markTaskAsCompleted(int id) throws SQLException {
         updateTaskStatus(id, TaskStatus.COMPLETED);
+    }
+
+    @Override
+    public void postponeTask(Task task, int days) throws SQLException {
+        if (task.getStatus() != TaskStatus.ACTIVE && task.getStatus() != TaskStatus.OVERDUE) {
+            throw new SQLException("Можно откладывать только активные или просроченные задачи");
+        }
+
+        task.setStatus(TaskStatus.POSTPONED);
+        task.setDueDate(task.getDueDate().plusDays(days));
+
+        // Явное обновление в списке
+        int index = tasks.indexOf(task);
+        if (index >= 0) {
+            tasks.set(index, task);
+        }
+
+        saveToFile();
     }
 
     @Override

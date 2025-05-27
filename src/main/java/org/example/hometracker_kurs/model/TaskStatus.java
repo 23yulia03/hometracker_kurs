@@ -20,13 +20,11 @@ public enum TaskStatus {
     public static boolean isTransitionAllowed(TaskStatus current, TaskStatus newStatus) {
         if (current == newStatus) return false;
 
-        switch (newStatus) {
-            case COMPLETED:
-                return current != CANCELLED;
-            case CANCELLED:
-                return current != COMPLETED;
-            default:
-                return true;
-        }
+        return switch (newStatus) {
+            case COMPLETED -> current != CANCELLED;
+            case CANCELLED -> current != COMPLETED;
+            case ACTIVE -> true; // <- разрешаем возврат в ACTIVE
+            default -> true;
+        };
     }
 }

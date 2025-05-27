@@ -26,33 +26,42 @@ public class FormHandler {
     }
 
     public boolean validateForm() {
-        if (nameField.getText().isEmpty()) {
-            return false;
-        }
-        if (dueDatePicker.getValue() == null || dueDatePicker.getValue().isBefore(LocalDate.now())) {
-            return false;
-        }
-        return assigneeComboBox.getValue() != null && typeComboBox.getValue() != null;
+        return !(nameField.getText().isBlank()
+                || dueDatePicker.getValue() == null
+                || dueDatePicker.getValue().isBefore(LocalDate.now())
+                || assigneeComboBox.getValue() == null
+                || typeComboBox.getValue() == null);
     }
 
     public Task createTaskFromForm() {
-        return new Task(
+        Task task = new Task(
                 0,
-                nameField.getText(),
-                descriptionField.getText(),
+                nameField.getText().trim(),
+                descriptionField.getText().trim(),
                 dueDatePicker.getValue(),
                 priorityComboBox.getValue(),
                 assigneeComboBox.getValue(),
                 TaskStatus.ACTIVE,
                 null
         );
+        task.setType(typeComboBox.getValue());
+        return task;
+    }
+
+    public void fillForm(Task task) {
+        nameField.setText(task.getName());
+        descriptionField.setText(task.getDescription());
+        dueDatePicker.setValue(task.getDueDate());
+        priorityComboBox.setValue(task.getPriority());
+        assigneeComboBox.setValue(task.getAssignedTo());
+        typeComboBox.setValue(task.getType());
     }
 
     public void clearForm() {
         nameField.clear();
         descriptionField.clear();
         dueDatePicker.setValue(null);
-        priorityComboBox.setValue(3);
+        priorityComboBox.setValue(3); // значение по умолчанию
         assigneeComboBox.getSelectionModel().clearSelection();
         typeComboBox.getSelectionModel().clearSelection();
     }

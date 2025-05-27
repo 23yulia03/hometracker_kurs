@@ -325,6 +325,11 @@ public class PostgresTaskDAO implements TaskDAO {
         updateTaskStatus(id, TaskStatus.COMPLETED);
     }
 
+    @Override
+    public void postponeTask(Task task, int days) throws SQLException {
+
+    }
+
     public void updateOverdueTasks() throws SQLException {
         String sql = """
             UPDATE tasks 
