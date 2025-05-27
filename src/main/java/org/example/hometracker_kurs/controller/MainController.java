@@ -127,6 +127,7 @@ public class MainController {
             Task updated = formHandler.createTaskFromForm();
             updated.setId(selected.getId());
             taskManagerService.updateTask(updated);
+            taskTable.refresh();
             reloadAndRefresh();
         } catch (SQLException e) {
             showAlert("Ошибка обновления", e.getMessage());
