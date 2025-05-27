@@ -11,8 +11,6 @@ public class HouseholdTrackerApp extends Application {
     public void start(Stage stage) {
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("main-view.fxml"));
-
-            // Контроллер теперь сам создаёт TaskService — не передаём ничего
             loader.setControllerFactory(controllerClass -> {
                 try {
                     return controllerClass.getDeclaredConstructor().newInstance();

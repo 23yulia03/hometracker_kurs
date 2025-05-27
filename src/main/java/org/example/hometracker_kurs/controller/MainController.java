@@ -16,9 +16,7 @@ import org.example.hometracker_kurs.service.TaskManagerService;
 import org.example.hometracker_kurs.service.TaskService;
 
 import java.sql.SQLException;
-import java.time.LocalDate;
 import java.util.Optional;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class MainController {

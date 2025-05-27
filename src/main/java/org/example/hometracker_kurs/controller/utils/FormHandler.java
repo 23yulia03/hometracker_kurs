@@ -48,15 +48,6 @@ public class FormHandler {
         return task;
     }
 
-    public void fillForm(Task task) {
-        nameField.setText(task.getName());
-        descriptionField.setText(task.getDescription());
-        dueDatePicker.setValue(task.getDueDate());
-        priorityComboBox.setValue(task.getPriority());
-        assigneeComboBox.setValue(task.getAssignedTo());
-        typeComboBox.setValue(task.getType());
-    }
-
     public void clearForm() {
         nameField.clear();
         descriptionField.clear();

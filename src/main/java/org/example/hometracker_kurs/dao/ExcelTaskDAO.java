@@ -363,6 +363,6 @@ public class ExcelTaskDAO implements TaskDAO {
 
     @Override
     public void close() throws SQLException {
-        // No resources to close for Excel
+        // Нет ресурсов для закрытия экселя
     }
 }
