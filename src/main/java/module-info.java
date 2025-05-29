@@ -4,6 +4,8 @@ module org.example.kurs3 {
     requires java.sql;
     requires org.apache.poi.poi;
     requires org.apache.poi.ooxml;
+    requires telegrambots;
+    requires telegrambots.meta;
 
 
     exports org.example.hometracker_kurs.controller;
