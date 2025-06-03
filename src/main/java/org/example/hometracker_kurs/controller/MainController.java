@@ -42,6 +42,7 @@ public class MainController {
     @FXML private DatePicker dueDatePicker;
     @FXML private ComboBox<Integer> priorityComboBox;
     @FXML private Label totalTasksLabel, activeTasksLabel, completedTasksLabel, overdueTasksLabel, dataSourceLabel;
+    @FXML private Label syncStatusLabel;
 
     @FXML
     public void initialize() {
@@ -258,17 +259,10 @@ public class MainController {
 
             String daoKey;
             switch (selectedSource) {
-                case "PostgreSQL":
-                    daoKey = "postgres";
-                    break;
-                case "Excel":
-                    daoKey = "excel";
-                    break;
-                case "H2 Database":
-                    daoKey = "h2";
-                    break;
-                default:
-                    throw new IllegalArgumentException("Неизвестный источник: " + selectedSource);
+                case "PostgreSQL" -> daoKey = "postgres";
+                case "Excel" -> daoKey = "excel";
+                case "H2 Database" -> daoKey = "h2";
+                default -> throw new IllegalArgumentException("Неизвестный источник: " + selectedSource);
             }
 
             DatabaseConfig dbConfig = new DatabaseConfig();
@@ -282,8 +276,14 @@ public class MainController {
 
             dataSourceLabel.setText("Источник: " + selectedSource);
             reloadAndRefresh();
+
+            // Попытка синхронизации после подключения
+            taskService.trySyncPendingTasks();
+            updateSyncStatusLabel("всё в порядке", Color.GREEN);
+
         } catch (Exception e) {
             showAlert("Ошибка подключения", e.getMessage());
+            updateSyncStatusLabel("ошибка или отложенные задачи", Color.ORANGE);
         }
     }
 
@@ -312,6 +312,13 @@ public class MainController {
         priorityComboBox.setValue(task.getPriority());
         assigneeComboBox.setValue(task.getAssignedTo());
         typeComboBox.setValue(task.getType());
+    }
+
+    private void updateSyncStatusLabel(String message, Color color) {
+        Platform.runLater(() -> {
+            syncStatusLabel.setText("Синхронизация: " + message);
+            syncStatusLabel.setTextFill(color);
+        });
     }
 
     private void showAlert(String title, String message) {

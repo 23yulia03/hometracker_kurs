@@ -8,9 +8,12 @@ import org.example.hometracker_kurs.dao.TaskDAO;
 import org.example.hometracker_kurs.dao.TaskDAOFactory;
 import org.example.hometracker_kurs.model.Task;
 import org.example.hometracker_kurs.model.TaskStatus;
+import org.example.hometracker_kurs.sync.PendingTaskQueue;
+import org.example.hometracker_kurs.sync.QueuedTaskOperation;
 
 import java.sql.SQLException;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.concurrent.*;
 
 public class TaskService {
@@ -72,35 +75,38 @@ public class TaskService {
     }
 
     public void addTask(Task task) throws SQLException {
-        validateTask(task);
-        taskDAO.addTask(task);
+        try {
+            validateTask(task);
+            taskDAO.addTask(task);
+        } catch (SQLException e) {
+            if (isNetworkIssue(e)) {
+                PendingTaskQueue.enqueue(task, "add");
+                System.err.println("⛔ Соединение потеряно, задача добавлена в очередь: " + task.getName());
+            } else throw e;
+        }
     }
 
     public void updateTask(Task task) throws SQLException {
-        validateTask(task);
-        taskDAO.updateTask(task);
-    }
-
-    private void validateTask(Task task) throws SQLException {
-        if (task == null) {
-            throw new SQLException("Задача не может быть null");
-        }
-        if (task.getName() == null || task.getName().trim().isEmpty()) {
-            throw new SQLException("Название задачи не может быть пустым");
-        }
-        if (task.getStatus() == null) {
-            throw new SQLException("Статус задачи не может быть null");
-        }
-        if (task.getDueDate() != null && task.getDueDate().isBefore(LocalDate.now())) {
-            throw new SQLException("Дата выполнения не может быть в прошлом");
-        }
-        if (task.getPriority() < 1 || task.getPriority() > 5) {
-            throw new SQLException("Приоритет должен быть между 1 и 5");
+        try {
+            validateTask(task);
+            taskDAO.updateTask(task);
+        } catch (SQLException e) {
+            if (isNetworkIssue(e)) {
+                PendingTaskQueue.enqueue(task, "update");
+                System.err.println("⛔ Соединение потеряно, обновление сохранено локально: " + task.getName());
+            } else throw e;
         }
     }
 
-    public void deleteTask(int id) throws SQLException {
-        taskDAO.deleteTask(id);
+    public void deleteTask(Task task) throws SQLException {
+        try {
+            if (task != null) taskDAO.deleteTask(task.getId());
+        } catch (SQLException e) {
+            if (isNetworkIssue(e)) {
+                PendingTaskQueue.enqueue(task, "delete");
+                System.err.println("⛔ Соединение потеряно, удаление сохранено локально: " + task.getName());
+            } else throw e;
+        }
     }
 
     public void completeTask(int id) throws SQLException {
@@ -124,5 +130,55 @@ public class TaskService {
         if (statusCheckScheduler != null) {
             statusCheckScheduler.shutdown();
         }
+    }
+
+    private void validateTask(Task task) throws SQLException {
+        if (task == null) {
+            throw new SQLException("Задача не может быть null");
+        }
+        if (task.getName() == null || task.getName().trim().isEmpty()) {
+            throw new SQLException("Название задачи не может быть пустым");
+        }
+        if (task.getStatus() == null) {
+            throw new SQLException("Статус задачи не может быть null");
+        }
+        if (task.getDueDate() != null && task.getDueDate().isBefore(LocalDate.now())) {
+            throw new SQLException("Дата выполнения не может быть в прошлом");
+        }
+        if (task.getPriority() < 1 || task.getPriority() > 5) {
+            throw new SQLException("Приоритет должен быть между 1 и 5");
+        }
+    }
+
+    private boolean isNetworkIssue(SQLException e) {
+        String msg = e.getMessage().toLowerCase();
+        return msg.contains("connection") || msg.contains("refused") || msg.contains("timeout");
+    }
+
+    public void trySyncPendingTasks() {
+        List<QueuedTaskOperation> queue = PendingTaskQueue.loadQueue();
+        if (queue.isEmpty()) {
+            System.out.println("✅ Нет отложенных операций для синхронизации");
+            return;
+        }
+
+        int success = 0;
+        for (QueuedTaskOperation op : queue) {
+            try {
+                Task task = op.getTask();
+                switch (op.getOperation()) {
+                    case "add" -> taskDAO.addTask(task);
+                    case "update" -> taskDAO.updateTask(task);
+                    case "delete" -> taskDAO.deleteTask(task.getId());
+                }
+                success++;
+            } catch (SQLException e) {
+                System.err.println("❌ Ошибка при синхронизации: " + e.getMessage());
+                return; // Прерываем — оставим в очереди
+            }
+        }
+
+        PendingTaskQueue.clearQueue();
+        System.out.println("✅ Синхронизировано операций: " + success);
     }
 }

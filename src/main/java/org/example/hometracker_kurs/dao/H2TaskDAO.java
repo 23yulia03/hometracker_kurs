@@ -23,7 +23,7 @@ public class H2TaskDAO implements TaskDAO {
     /**
      * Конструктор, устанавливающий соединение с H2 и выполняющий инициализацию таблиц.
      *
-     * @param config конфигурационный объект с параметрами подключения к H2
+     * @param dbConfig конфигурационный объект с параметрами подключения к H2
      * @throws SQLException если возникает ошибка при подключении
      */
     public H2TaskDAO(DatabaseConfig dbConfig) throws SQLException {

@@ -30,7 +30,7 @@ public class TaskManagerService {
 
     public void deleteTask(Task task) throws SQLException {
         if (task != null) {
-            taskService.deleteTask(task.getId());
+            taskService.deleteTask(task);
         }
     }
 

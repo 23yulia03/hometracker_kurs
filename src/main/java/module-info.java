@@ -7,6 +7,8 @@ module org.example.hometracker_kurs {
     requires telegrambots;
     requires telegrambots.meta;
     requires org.junit.jupiter.api;
+    requires com.fasterxml.jackson.core;
+    requires com.fasterxml.jackson.databind;
 
 
     exports org.example.hometracker_kurs.controller;

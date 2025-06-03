@@ -23,9 +23,22 @@
     <Button onAction="#switchDataSource" style="-fx-background-color: #2196F3; -fx-text-fill: white; -fx-font-weight: bold;" text="Переключить" />
   </HBox>
 
+
   <!-- 2. Индикатор текущего источника -->
-  <HBox alignment="CENTER" style="-fx-padding: 5;">
-    <Label fx:id="dataSourceLabel" style="-fx-font-style: italic; -fx-font-weight: bold; -fx-text-fill: #2196F3;" text="Текущий источник: не выбран" />
+  <HBox alignment="CENTER" spacing="20" style="-fx-padding: 5;">
+    <!-- Лейбл синхронизации (слева) -->
+    <Label fx:id="syncStatusLabel" style="-fx-font-style: italic; -fx-text-fill: darkorange;" text="Синхронизация: проверка..." />
+
+    <!-- Пустое пространство для отступа -->
+    <Pane HBox.hgrow="ALWAYS">
+      <children>
+
+        <!-- Лейбл текущего источника (посередине) -->
+        <Label fx:id="dataSourceLabel" layoutX="446.0" layoutY="1.0" style="-fx-font-style: italic; -fx-font-weight: bold; -fx-text-fill: #2196F3;" text="Текущий источник: не выбран" />
+      </children></Pane>
+
+    <!-- Пустое пространство для балансировки -->
+    <Pane HBox.hgrow="ALWAYS" />
   </HBox>
 
   <!-- 4. Панель фильтров -->
