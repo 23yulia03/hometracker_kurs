@@ -18,36 +18,36 @@ class TaskServiceUnitTest {
 
     @BeforeAll
     static void init() {
-        service = new TaskService("postgres"); // Используем postgres DAO для тестов
-        task = new Task(0, "Тестовая задача", "Описание",
+        service = new TaskService("postgres"); // РСЃРїРѕР»СЊР·СѓРµРј postgres DAO РґР»СЏ С‚РµСЃС‚РѕРІ
+        task = new Task(0, "РўРµСЃС‚РѕРІР°СЏ Р·Р°РґР°С‡Р°", "РћРїРёСЃР°РЅРёРµ",
                 LocalDate.now().plusDays(1), 3,
-                "Мама", TaskStatus.ACTIVE, null);
-        task.setType("Уборка");
+                "РњР°РјР°", TaskStatus.ACTIVE, null);
+        task.setType("РЈР±РѕСЂРєР°");
     }
 
     @Test
     @Order(1)
     void testAddTask() throws SQLException {
         service.addTask(task);
-        assertTrue(task.getId() > 0, "ID должен быть присвоен после добавления");
+        assertTrue(task.getId() > 0, "ID РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ РїСЂРёСЃРІРѕРµРЅ РїРѕСЃР»Рµ РґРѕР±Р°РІР»РµРЅРёСЏ");
     }
 
     @Test
     @Order(2)
     void testGetAllTasks() throws SQLException {
         List<Task> tasks = service.getAllTasks();
-        assertFalse(tasks.isEmpty(), "Список задач должен содержать хотя бы одну задачу");
+        assertFalse(tasks.isEmpty(), "РЎРїРёСЃРѕРє Р·Р°РґР°С‡ РґРѕР»Р¶РµРЅ СЃРѕРґРµСЂР¶Р°С‚СЊ С…РѕС‚СЏ Р±С‹ РѕРґРЅСѓ Р·Р°РґР°С‡Сѓ");
     }
 
     @Test
     @Order(3)
     void testUpdateTask() throws SQLException {
-        task.setDescription("Новое описание");
+        task.setDescription("РќРѕРІРѕРµ РѕРїРёСЃР°РЅРёРµ");
         service.updateTask(task);
 
         Task updated = service.getAllTasks().stream()
                 .filter(t -> t.getId() == task.getId()).findFirst().orElseThrow();
-        assertEquals("Новое описание", updated.getDescription());
+        assertEquals("РќРѕРІРѕРµ РѕРїРёСЃР°РЅРёРµ", updated.getDescription());
     }
 
     @Test
@@ -79,7 +79,7 @@ class TaskServiceUnitTest {
 
         boolean exists = service.getAllTasks().stream()
                 .anyMatch(t -> t.getId() == task.getId());
-        assertFalse(exists, "Задача должна быть удалена");
+        assertFalse(exists, "Р—Р°РґР°С‡Р° РґРѕР»Р¶РЅР° Р±С‹С‚СЊ СѓРґР°Р»РµРЅР°");
     }
 
     @AfterAll
