@@ -2,7 +2,7 @@ package org.example.hometracker_kurs.dao;
 
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
-import org.example.hometracker_kurs.model.Config;
+import org.example.hometracker_kurs.config.DatabaseConfig;
 import org.example.hometracker_kurs.model.Task;
 import org.example.hometracker_kurs.model.TaskStatus;
 
@@ -13,11 +13,11 @@ import java.util.logging.Logger;
 
 public class PostgresTaskDAO implements TaskDAO {
     private static final Logger logger = Logger.getLogger(PostgresTaskDAO.class.getName());
-    private final Config config;
+    private final DatabaseConfig dbConfig;
     private Connection connection;
 
-    public PostgresTaskDAO(Config config) {
-        this.config = config;
+    public PostgresTaskDAO(DatabaseConfig dbConfig) {
+        this.dbConfig = dbConfig;
         initialize();
         try {
             updateOverdueTasks();
@@ -39,9 +39,9 @@ public class PostgresTaskDAO implements TaskDAO {
     private Connection getConnection() throws SQLException {
         if (connection == null || connection.isClosed()) {
             connection = DriverManager.getConnection(
-                    config.getDbUrl(),
-                    config.getDbUser(),
-                    config.getDbPassword()
+                    dbConfig.getPostgresUrl(),
+                    dbConfig.getPostgresUser(),
+                    dbConfig.getPostgresPassword()
             );
         }
         return connection;
@@ -117,9 +117,15 @@ public class PostgresTaskDAO implements TaskDAO {
 
         if (status != null && !status.equals("Все")) {
             switch (status) {
-                case "Активные" -> sql.append(" AND status = 'ACTIVE'");
-                case "Выполненные" -> sql.append(" AND status = 'COMPLETED'");
-                case "Просроченные" -> sql.append(" AND status = 'OVERDUE'");
+                case "Активные":
+                    sql.append(" AND status = 'ACTIVE'");
+                    break;
+                case "Выполненные":
+                    sql.append(" AND status = 'COMPLETED'");
+                    break;
+                case "Просроченные":
+                    sql.append(" AND status = 'OVERDUE'");
+                    break;
             }
         }
 

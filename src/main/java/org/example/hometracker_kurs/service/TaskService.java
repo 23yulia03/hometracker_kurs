@@ -2,9 +2,10 @@ package org.example.hometracker_kurs.service;
 
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import org.example.hometracker_kurs.config.DatabaseConfig;
+import org.example.hometracker_kurs.config.ExcelConfig;
 import org.example.hometracker_kurs.dao.TaskDAO;
 import org.example.hometracker_kurs.dao.TaskDAOFactory;
-import org.example.hometracker_kurs.model.Config;
 import org.example.hometracker_kurs.model.Task;
 import org.example.hometracker_kurs.model.TaskStatus;
 
@@ -16,9 +17,9 @@ public class TaskService {
     private final TaskDAO taskDAO;
     private ScheduledExecutorService statusCheckScheduler;
 
-    public TaskService(String daoType) {
+    public TaskService(String daoType, DatabaseConfig dbConfig, ExcelConfig excelConfig) {
         try {
-            this.taskDAO = TaskDAOFactory.createTaskDAO(daoType, new Config());
+            this.taskDAO = TaskDAOFactory.createTaskDAO(daoType, dbConfig, excelConfig);
             startStatusChecker();
         } catch (SQLException e) {
             throw new RuntimeException("Не удалось создать DAO: " + e.getMessage(), e);

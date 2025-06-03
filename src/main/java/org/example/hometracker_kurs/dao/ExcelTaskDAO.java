@@ -4,7 +4,7 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import org.example.hometracker_kurs.model.Config;
+import org.example.hometracker_kurs.config.ExcelConfig;
 import org.example.hometracker_kurs.model.Task;
 import org.example.hometracker_kurs.model.TaskStatus;
 
@@ -20,14 +20,24 @@ import java.util.Iterator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+/**
+ * Реализация интерфейса {@link TaskDAO} для работы с задачами, хранящимися в Excel-файле.
+ * Использует Apache POI для чтения и записи данных в формате XLSX.
+ */
 public class ExcelTaskDAO implements TaskDAO {
     private static final Logger logger = Logger.getLogger(ExcelTaskDAO.class.getName());
     private final String filePath;
     private final ObservableList<Task> tasks = FXCollections.observableArrayList();
     private int nextId = 1;
 
-    public ExcelTaskDAO(Config config) {
-        this.filePath = config.getExcelPath();
+    /**
+     * Создаёт экземпляр ExcelTaskDAO с указанным конфигом.
+     * Загружает данные из Excel-файла, если он существует.
+     *
+     * @param config конфигурационный объект, содержащий путь к Excel-файлу
+     */
+    public ExcelTaskDAO(ExcelConfig config) {
+        this.filePath = config.getFilePath();
         loadTasks();
     }
 
@@ -77,17 +87,29 @@ public class ExcelTaskDAO implements TaskDAO {
         return tasks.stream()
                 .filter(task -> {
                     boolean matchesType = (type == null || type.isEmpty() || type.equals(task.getType()));
-                    boolean matchesStatus = switch (status) {
-                        case "Все" -> true;
-                        case null -> true;
-                        case "Активные" -> task.getStatus() == TaskStatus.ACTIVE;
-                        case "Выполненные" -> task.getStatus() == TaskStatus.COMPLETED;
-                        case "Просроченные" -> task.getStatus() == TaskStatus.OVERDUE;
-                        default -> false;
-                    };
+
+                    boolean matchesStatus = true;
+                    if (status != null && !"Все".equals(status)) {
+                        switch (status) {
+                            case "Активные":
+                                matchesStatus = task.getStatus() == TaskStatus.ACTIVE;
+                                break;
+                            case "Выполненные":
+                                matchesStatus = task.getStatus() == TaskStatus.COMPLETED;
+                                break;
+                            case "Просроченные":
+                                matchesStatus = task.getStatus() == TaskStatus.OVERDUE;
+                                break;
+                            default:
+                                matchesStatus = false;
+                                break;
+                        }
+                    }
+
                     boolean matchesKeyword = (keyword == null || keyword.isBlank() ||
                             task.getName().toLowerCase().contains(keyword.toLowerCase()) ||
                             task.getDescription().toLowerCase().contains(keyword.toLowerCase()));
+
                     return matchesType && matchesStatus && matchesKeyword;
                 })
                 .sorted(comparator)

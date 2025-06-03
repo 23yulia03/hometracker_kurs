@@ -2,7 +2,7 @@ package org.example.hometracker_kurs.dao;
 
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
-import org.example.hometracker_kurs.model.Config;
+import org.example.hometracker_kurs.config.DatabaseConfig;
 import org.example.hometracker_kurs.model.Task;
 import org.example.hometracker_kurs.model.TaskStatus;
 
@@ -11,15 +11,26 @@ import java.time.LocalDate;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+/**
+ * Реализация интерфейса {@link TaskDAO}, использующая встроенную базу данных H2
+ * для хранения и управления задачами.
+ * Поддерживает операции CRUD и фильтрацию задач.
+ */
 public class H2TaskDAO implements TaskDAO {
     private static final Logger logger = Logger.getLogger(H2TaskDAO.class.getName());
     private final Connection connection;
 
-    public H2TaskDAO(Config config) throws SQLException {
+    /**
+     * Конструктор, устанавливающий соединение с H2 и выполняющий инициализацию таблиц.
+     *
+     * @param config конфигурационный объект с параметрами подключения к H2
+     * @throws SQLException если возникает ошибка при подключении
+     */
+    public H2TaskDAO(DatabaseConfig dbConfig) throws SQLException {
         this.connection = DriverManager.getConnection(
-                config.getH2Url(),
-                config.getH2User(),
-                config.getH2Password()
+                dbConfig.getH2Url(),
+                dbConfig.getH2User(),
+                dbConfig.getH2Password()
         );
         createTable();
         migrateDatabase();
@@ -80,9 +91,15 @@ public class H2TaskDAO implements TaskDAO {
 
         if (status != null && !status.equals("Все")) {
             switch (status) {
-                case "Активные" -> sql.append(" AND status = 'ACTIVE'");
-                case "Выполненные" -> sql.append(" AND status = 'COMPLETED'");
-                case "Просроченные" -> sql.append(" AND status = 'OVERDUE'");
+                case "Активные":
+                    sql.append(" AND status = 'ACTIVE'");
+                    break;
+                case "Выполненные":
+                    sql.append(" AND status = 'COMPLETED'");
+                    break;
+                case "Просроченные":
+                    sql.append(" AND status = 'OVERDUE'");
+                    break;
             }
         }
 

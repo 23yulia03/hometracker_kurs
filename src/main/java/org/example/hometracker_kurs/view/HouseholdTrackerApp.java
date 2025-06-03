@@ -5,9 +5,11 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
-import org.example.hometracker_kurs.telegram.Scheduler;
-import org.example.hometracker_kurs.model.Config;
+import org.example.hometracker_kurs.config.DatabaseConfig;
+import org.example.hometracker_kurs.config.ExcelConfig;
+import org.example.hometracker_kurs.config.TelegramConfig;
 import org.example.hometracker_kurs.service.TaskService;
+import org.example.hometracker_kurs.telegram.Scheduler;
 import org.example.hometracker_kurs.telegram.TelegramReminderBot;
 import org.telegram.telegrambots.meta.TelegramBotsApi;
 import org.telegram.telegrambots.updatesreceivers.DefaultBotSession;
@@ -25,9 +27,15 @@ public class HouseholdTrackerApp extends Application {
                 }
             });
 
-            Config config = new Config();
-            TaskService taskService = new TaskService("postgres"); // или "excel", "h2"
-            TelegramReminderBot bot = new TelegramReminderBot(config, taskService);
+            // Создание отдельных конфигураций
+            DatabaseConfig dbConfig = new DatabaseConfig();
+            ExcelConfig excelConfig = new ExcelConfig();
+            TelegramConfig telegramConfig = new TelegramConfig();
+
+            dbConfig = new DatabaseConfig();
+            excelConfig = new ExcelConfig();
+            TaskService taskService = new TaskService("postgres", dbConfig, excelConfig);
+            TelegramReminderBot bot = new TelegramReminderBot(telegramConfig, taskService);
 
             try {
                 TelegramBotsApi botsApi = new TelegramBotsApi(DefaultBotSession.class);

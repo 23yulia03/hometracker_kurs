@@ -7,6 +7,8 @@ import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.paint.Color;
+import org.example.hometracker_kurs.config.DatabaseConfig;
+import org.example.hometracker_kurs.config.ExcelConfig;
 import org.example.hometracker_kurs.controller.utils.FilterManager;
 import org.example.hometracker_kurs.controller.utils.FormHandler;
 import org.example.hometracker_kurs.controller.utils.StatisticsCalculator;
@@ -19,6 +21,11 @@ import java.sql.SQLException;
 import java.util.Optional;
 import java.util.logging.Logger;
 
+/**
+ * Главный контроллер приложения управления домашними задачами.
+ * Отвечает за обработку пользовательского интерфейса, управление задачами,
+ * взаимодействие с сервисами и визуальное отображение данных.
+ */
 public class MainController {
     private final Logger logger = Logger.getLogger(getClass().getName());
     private TaskService taskService;
@@ -87,13 +94,29 @@ public class MainController {
                     setTextFill(Color.BLACK);
                 } else {
                     setText(status.getDisplayName());
-                    setTextFill(switch (status) {
-                        case ACTIVE -> Color.GREEN;
-                        case COMPLETED -> Color.BLUE;
-                        case POSTPONED -> Color.ORANGE;
-                        case CANCELLED -> Color.GRAY;
-                        case OVERDUE -> Color.RED;
-                    });
+                    Color color;
+
+                    switch (status) {
+                        case ACTIVE:
+                            color = Color.GREEN;
+                            break;
+                        case COMPLETED:
+                            color = Color.BLUE;
+                            break;
+                        case POSTPONED:
+                            color = Color.ORANGE;
+                            break;
+                        case CANCELLED:
+                            color = Color.GRAY;
+                            break;
+                        case OVERDUE:
+                            color = Color.RED;
+                            break;
+                        default:
+                            color = Color.BLACK;
+                    }
+
+                    setTextFill(color);
                 }
             }
         });
@@ -220,7 +243,8 @@ public class MainController {
         refreshData();
     }
 
-    @FXML private void switchDataSource() {
+    @FXML
+    private void switchDataSource() {
         String selectedSource = dataSourceComboBox.getValue();
         if (selectedSource == null) {
             showAlert("Ошибка", "Выберите источник данных");
@@ -228,18 +252,33 @@ public class MainController {
         }
 
         try {
-            if (taskService != null) taskService.close();
+            if (taskService != null) {
+                taskService.close();
+            }
 
-            String daoKey = switch (selectedSource) {
-                case "PostgreSQL" -> "postgres";
-                case "Excel" -> "excel";
-                case "H2 Database" -> "h2";
-                default -> throw new IllegalArgumentException("Неизвестный источник: " + selectedSource);
-            };
+            String daoKey;
+            switch (selectedSource) {
+                case "PostgreSQL":
+                    daoKey = "postgres";
+                    break;
+                case "Excel":
+                    daoKey = "excel";
+                    break;
+                case "H2 Database":
+                    daoKey = "h2";
+                    break;
+                default:
+                    throw new IllegalArgumentException("Неизвестный источник: " + selectedSource);
+            }
 
-            this.taskService = new TaskService(daoKey);
+            DatabaseConfig dbConfig = new DatabaseConfig();
+            ExcelConfig excelConfig = new ExcelConfig();
+            this.taskService = new TaskService(daoKey, dbConfig, excelConfig);
             this.taskManagerService = new TaskManagerService(taskService);
-            this.filterManager = new FilterManager(taskTypeComboBox, statusComboBox, searchField, sortFieldComboBox, sortOrderComboBox, taskManagerService);
+            this.filterManager = new FilterManager(
+                    taskTypeComboBox, statusComboBox, searchField,
+                    sortFieldComboBox, sortOrderComboBox, taskManagerService
+            );
 
             dataSourceLabel.setText("Источник: " + selectedSource);
             reloadAndRefresh();

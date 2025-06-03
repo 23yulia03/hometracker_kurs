@@ -1,4 +1,4 @@
-module org.example.kurs3 {
+module org.example.hometracker_kurs {
     requires javafx.controls;
     requires javafx.fxml;
     requires java.sql;
@@ -6,6 +6,7 @@ module org.example.kurs3 {
     requires org.apache.poi.ooxml;
     requires telegrambots;
     requires telegrambots.meta;
+    requires org.junit.jupiter.api;
 
 
     exports org.example.hometracker_kurs.controller;
