@@ -109,7 +109,7 @@
           <PropertyValueFactory property="description" />
         </cellValueFactory>
       </TableColumn>
-      <TableColumn prefWidth="120" text="Срок выполнения">
+      <TableColumn fx:id="dueDateColumn" prefWidth="120" text="Срок выполнения">
         <cellValueFactory>
           <PropertyValueFactory property="dueDate" />
         </cellValueFactory>

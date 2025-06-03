@@ -1,3 +1,4 @@
+// Импорты
 package org.example.hometracker_kurs.controller;
 
 import javafx.application.Platform;
@@ -18,14 +19,11 @@ import org.example.hometracker_kurs.service.TaskManagerService;
 import org.example.hometracker_kurs.service.TaskService;
 
 import java.sql.SQLException;
-import java.util.Optional;
+import java.time.LocalDate;
+import java.util.*;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
-/**
- * Главный контроллер приложения управления домашними задачами.
- * Отвечает за обработку пользовательского интерфейса, управление задачами,
- * взаимодействие с сервисами и визуальное отображение данных.
- */
 public class MainController {
     private final Logger logger = Logger.getLogger(getClass().getName());
     private TaskService taskService;
@@ -36,6 +34,7 @@ public class MainController {
 
     @FXML private TableView<Task> taskTable;
     @FXML private TableColumn<Task, TaskStatus> statusColumn;
+    @FXML private TableColumn<Task, LocalDate> dueDateColumn;
     @FXML private ComboBox<String> taskTypeComboBox, statusComboBox, sortFieldComboBox, sortOrderComboBox, dataSourceComboBox, assigneeComboBox, typeComboBox;
     @FXML private TextField searchField, nameField;
     @FXML private TextArea descriptionField;
@@ -75,17 +74,34 @@ public class MainController {
     private void setupTableColumns() {
         taskTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         taskTable.getSelectionModel().selectedItemProperty().addListener((obs, oldSel, newSel) -> {
-            if (newSel != null) {
-                fillFormWithSelectedTask(newSel);
+            if (newSel != null) fillFormWithSelectedTask(newSel);
+        });
+
+        dueDateColumn.setCellFactory(col -> new TableCell<>() {
+            @Override
+            protected void updateItem(LocalDate dueDate, boolean empty) {
+                super.updateItem(dueDate, empty);
+                if (empty || dueDate == null) {
+                    setText(null);
+                } else {
+                    long count = taskTable.getItems().stream()
+                            .filter(t -> dueDate.equals(t.getDueDate()))
+                            .count();
+
+                    if (count > 1) {
+                        setText("⚠ " + dueDate.toString());
+                        setTextFill(Color.ORANGERED);
+                    } else {
+                        setText(dueDate.toString());
+                        setTextFill(Color.BLACK);
+                    }
+                }
             }
         });
     }
 
     private void setupStatusColumn() {
-        // Говорим, откуда брать значение для отображения
         statusColumn.setCellValueFactory(cellData -> new SimpleObjectProperty<>(cellData.getValue().getStatus()));
-
-        // Настраиваем цвет текста в зависимости от значения
         statusColumn.setCellFactory(col -> new TableCell<>() {
             @Override
             protected void updateItem(TaskStatus status, boolean empty) {
@@ -95,29 +111,14 @@ public class MainController {
                     setTextFill(Color.BLACK);
                 } else {
                     setText(status.getDisplayName());
-                    Color color;
-
-                    switch (status) {
-                        case ACTIVE:
-                            color = Color.GREEN;
-                            break;
-                        case COMPLETED:
-                            color = Color.BLUE;
-                            break;
-                        case POSTPONED:
-                            color = Color.ORANGE;
-                            break;
-                        case CANCELLED:
-                            color = Color.GRAY;
-                            break;
-                        case OVERDUE:
-                            color = Color.RED;
-                            break;
-                        default:
-                            color = Color.BLACK;
-                    }
-
-                    setTextFill(color);
+                    setTextFill(switch (status) {
+                        case ACTIVE -> Color.GREEN;
+                        case COMPLETED -> Color.BLUE;
+                        case POSTPONED -> Color.ORANGE;
+                        case CANCELLED -> Color.GRAY;
+                        case OVERDUE -> Color.RED;
+                        default -> Color.BLACK;
+                    });
                 }
             }
         });
@@ -132,6 +133,13 @@ public class MainController {
             showAlert("Ошибка", "Заполните все обязательные поля");
             return;
         }
+
+        LocalDate date = dueDatePicker.getValue();
+        if (isDateConflict(date, null)) {
+            showAlert("Ошибка", "На выбранную дату уже есть задача.");
+            return;
+        }
+
         try {
             taskManagerService.addTask(formHandler.createTaskFromForm());
             formHandler.clearForm();
@@ -148,6 +156,12 @@ public class MainController {
         try {
             Task updated = formHandler.createTaskFromForm();
             updated.setId(selected.getId());
+
+            if (isDateConflict(updated.getDueDate(), (int) selected.getId())) {
+                showAlert("Ошибка", "На эту дату уже есть другая задача.");
+                return;
+            }
+
             taskManagerService.updateTask(updated);
             taskTable.refresh();
             reloadAndRefresh();
@@ -181,8 +195,7 @@ public class MainController {
         }
     }
 
-    @FXML
-    private void postponeTask() {
+    @FXML private void postponeTask() {
         Task selected = getSelectedTaskOrAlert("откладывания");
         if (selected == null || selected.getStatus() == TaskStatus.POSTPONED) {
             showAlert("Информация", "Задача уже отложена");
@@ -201,7 +214,6 @@ public class MainController {
                 taskManagerService.postponeTask(selected, daysToPostpone);
                 taskTable.refresh();
                 reloadAndRefresh();
-
                 showAlert("Успех", "Задача отложена на " + daysToPostpone + " дней");
             } catch (NumberFormatException e) {
                 showAlert("Ошибка", "Введите корректное число дней");
@@ -211,8 +223,7 @@ public class MainController {
         }
     }
 
-    @FXML
-    private void reactivateTask() {
+    @FXML private void reactivateTask() {
         Task selected = taskTable.getSelectionModel().getSelectedItem();
         if (selected == null) {
             showAlert("Ошибка", "Выберите задачу для активации");
@@ -244,8 +255,7 @@ public class MainController {
         refreshData();
     }
 
-    @FXML
-    private void switchDataSource() {
+    @FXML private void switchDataSource() {
         String selectedSource = dataSourceComboBox.getValue();
         if (selectedSource == null) {
             showAlert("Ошибка", "Выберите источник данных");
@@ -253,31 +263,24 @@ public class MainController {
         }
 
         try {
-            if (taskService != null) {
-                taskService.close();
-            }
+            if (taskService != null) taskService.close();
 
-            String daoKey;
-            switch (selectedSource) {
-                case "PostgreSQL" -> daoKey = "postgres";
-                case "Excel" -> daoKey = "excel";
-                case "H2 Database" -> daoKey = "h2";
+            String daoKey = switch (selectedSource) {
+                case "PostgreSQL" -> "postgres";
+                case "Excel" -> "excel";
+                case "H2 Database" -> "h2";
                 default -> throw new IllegalArgumentException("Неизвестный источник: " + selectedSource);
-            }
+            };
 
             DatabaseConfig dbConfig = new DatabaseConfig();
             ExcelConfig excelConfig = new ExcelConfig();
             this.taskService = new TaskService(daoKey, dbConfig, excelConfig);
             this.taskManagerService = new TaskManagerService(taskService);
-            this.filterManager = new FilterManager(
-                    taskTypeComboBox, statusComboBox, searchField,
-                    sortFieldComboBox, sortOrderComboBox, taskManagerService
-            );
+            this.filterManager = new FilterManager(taskTypeComboBox, statusComboBox, searchField,
+                    sortFieldComboBox, sortOrderComboBox, taskManagerService);
 
             dataSourceLabel.setText("Источник: " + selectedSource);
             reloadAndRefresh();
-
-            // Попытка синхронизации после подключения
             taskService.trySyncPendingTasks();
             updateSyncStatusLabel("всё в порядке", Color.GREEN);
 
@@ -319,6 +322,14 @@ public class MainController {
             syncStatusLabel.setText("Синхронизация: " + message);
             syncStatusLabel.setTextFill(color);
         });
+    }
+
+    private boolean isDateConflict(LocalDate date, Integer ignoreId) {
+        if (date == null) return false;
+        return taskTable.getItems().stream()
+                .filter(t -> date.equals(t.getDueDate()))
+                .filter(t -> ignoreId == null || !Objects.equals(t.getId(), ignoreId))
+                .count() > 0;
     }
 
     private void showAlert(String title, String message) {
