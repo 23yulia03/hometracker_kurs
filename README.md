@@ -104,4 +104,8 @@
 
 ---
 
+## Демонстрация работы программы
+![Рабочее окно программы](https://github.com/23yulia03/Task2/blob/develop/img/screenshot.png)
 
+## Архитектура
+![Вывод на экран Диаграммы Классов](https://github.com/23yulia03/Task2/blob/develop/ClassDiagram-task2.png)
