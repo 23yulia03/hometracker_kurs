@@ -108,4 +108,4 @@
 ![Рабочее окно программы](https://github.com/23yulia03/Task2/blob/develop/img/screenshot.png)
 
 ## Архитектура
-![Вывод на экран Диаграммы Классов](https://github.com/23yulia03/Task2/blob/develop/ClassDiagram-task2.png)
+![Вывод на экран Диаграммы Классов](https://github.com/23yulia03/hometracker_kurs/blob/main/diagram_package.png)
