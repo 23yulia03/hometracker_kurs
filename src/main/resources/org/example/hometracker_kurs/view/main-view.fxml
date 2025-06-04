@@ -27,14 +27,14 @@
   <!-- 2. Индикатор текущего источника -->
   <HBox alignment="CENTER" spacing="20" style="-fx-padding: 5;">
     <!-- Лейбл синхронизации (слева) -->
-    <Label fx:id="syncStatusLabel" style="-fx-font-style: italic; -fx-text-fill: darkorange;" text="Синхронизация: проверка..." />
+    <Label fx:id="syncStatusLabel" prefHeight="18.0" prefWidth="278.0" style="-fx-font-style: italic; -fx-text-fill: darkorange;" text="Синхронизация: проверка..." />
 
     <!-- Пустое пространство для отступа -->
     <Pane HBox.hgrow="ALWAYS">
       <children>
 
         <!-- Лейбл текущего источника (посередине) -->
-        <Label fx:id="dataSourceLabel" layoutX="446.0" layoutY="1.0" style="-fx-font-style: italic; -fx-font-weight: bold; -fx-text-fill: #2196F3;" text="Текущий источник: не выбран" />
+        <Label fx:id="dataSourceLabel" layoutX="328.0" layoutY="1.0" prefHeight="17.0" prefWidth="300.0" style="-fx-font-style: italic; -fx-font-weight: bold; -fx-text-fill: #2196F3;" text="Текущий источник: не выбран" />
       </children></Pane>
 
     <!-- Пустое пространство для балансировки -->
