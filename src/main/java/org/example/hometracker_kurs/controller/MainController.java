@@ -84,15 +84,21 @@ public class MainController {
                 if (empty || dueDate == null) {
                     setText(null);
                 } else {
+                    // Форматируем дату в дд.мм.гггг
+                    String formattedDate = String.format("%02d.%02d.%d",
+                            dueDate.getDayOfMonth(),
+                            dueDate.getMonthValue(),
+                            dueDate.getYear());
+
                     long count = taskTable.getItems().stream()
                             .filter(t -> dueDate.equals(t.getDueDate()))
                             .count();
 
                     if (count > 1) {
-                        setText("⚠ " + dueDate.toString());
+                        setText("⚠ " + formattedDate);
                         setTextFill(Color.ORANGERED);
                     } else {
-                        setText(dueDate.toString());
+                        setText(formattedDate);
                         setTextFill(Color.BLACK);
                     }
                 }
@@ -286,7 +292,7 @@ public class MainController {
 
         } catch (Exception e) {
             showAlert("Ошибка подключения", e.getMessage());
-            updateSyncStatusLabel("ошибка или отложенные задачи", Color.ORANGE);
+            updateSyncStatusLabel("ошибка синхронизации", Color.ORANGE);
         }
     }
 
