@@ -105,7 +105,7 @@
 ---
 
 ## Демонстрация работы программы
-![Рабочее окно программы](https://github.com/23yulia03/hometracker_kurs/blob/main/%D0%98%D0%BD%D1%82%D0%B5%D1%80%D1%84%D0%B5%D0%B9%D1%81.jpg)
+![Рабочее окно программы](https://github.com/23yulia03/hometracker_kurs/blob/main/img/img.png)
 
 ## Архитектура
 ![Вывод на экран Диаграммы Классов](https://github.com/23yulia03/hometracker_kurs/blob/main/diagram_package.png)
