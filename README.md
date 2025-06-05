@@ -117,4 +117,4 @@
 ![Рабочее окно программы](https://github.com/23yulia03/hometracker_kurs/blob/main/img/img.png)
 
 ## Архитектура
-![Вывод на экран Диаграммы Классов](https://github.com/23yulia03/hometracker_kurs/blob/main/diagram_package.png)
+![Вывод на экран Диаграммы Классов](https://github.com/23yulia03/hometracker_kurs/blob/main/img/diagram_package.png)
