@@ -104,6 +104,9 @@
 
 ---
 
+## Концепция проекта
+[Концепция проекта](hometracker_kurs/Project%20concept.md)
+
 ## Демонстрация работы программы
 ![Рабочее окно программы](https://github.com/23yulia03/hometracker_kurs/blob/main/img/img.png)
 
