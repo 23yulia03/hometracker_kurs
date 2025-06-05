@@ -107,6 +107,9 @@
 ## Концепция проекта 
 [Концепция проекта](Project%20concept.md)
 
+## Сценарии использования
+[Сценарии использования](Usage%20Scenarios.md)
+
 ## Демонстрация работы программы
 ![Рабочее окно программы](https://github.com/23yulia03/hometracker_kurs/blob/main/img/img.png)
 
