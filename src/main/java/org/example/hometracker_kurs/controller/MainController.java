@@ -176,15 +176,25 @@ public class MainController {
         }
     }
 
-    @FXML private void deleteTask() {
+    @FXML
+    private void deleteTask() {
         Task selected = getSelectedTaskOrAlert("удаления");
         if (selected == null) return;
 
-        try {
-            taskManagerService.deleteTask(selected);
-            reloadAndRefresh();
-        } catch (SQLException e) {
-            showAlert("Ошибка удаления", e.getMessage());
+        Alert confirmAlert = new Alert(Alert.AlertType.CONFIRMATION);
+        confirmAlert.setTitle("Подтверждение удаления");
+        confirmAlert.setHeaderText(null);
+        confirmAlert.setContentText("Вы уверены, что хотите удалить задачу \"" + selected.getName() + "\"?");
+
+        Optional<ButtonType> result = confirmAlert.showAndWait();
+        if (result.isPresent() && result.get() == ButtonType.OK) {
+            try {
+                taskManagerService.deleteTask(selected);
+                reloadAndRefresh();
+                showAlert("Успех", "Задача удалена");
+            } catch (SQLException e) {
+                showAlert("Ошибка удаления", e.getMessage());
+            }
         }
     }
 
